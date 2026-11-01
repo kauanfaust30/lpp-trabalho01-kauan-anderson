@@ -91,6 +91,8 @@ async def abertura_solicitada(sid):
     # 4. emitir o fato
     # Por quê: a temporada aberta muda a tela de TODOS, então vai para todas as abas.
     await sio.emit("cervejaria.iniciada", fato(causa_pedido(sid)))
+    # 5. a partir de agora o tempo passa: a cevada é produzida sozinha (R6/FR-006)
+    sio.start_background_task(ciclo_producao)
 
 
 # ----- Etapa 3: pedido e fato de construir -----
@@ -118,3 +120,47 @@ async def construcao_solicitada(sid, dados=None):
     # abas precisam ver a obra começar.
     obra = {"id": obra_id, "tipo": tipo, "pedida_por": participante["nome"]}
     await sio.emit("construcao.iniciada", fato(causa_pedido(sid), obra=obra))
+    # 5. a obra termina sozinha depois de TEMPO_OBRA segundos (FR-007)
+    sio.start_background_task(esperar_obra, obra_id)
+
+
+# ----- Etapa 5: passagem do tempo (fatos que ninguém pediu) -----
+
+async def produzir_cevada():
+    # Por quê: a cevada só cresce com a temporada aberta; a fase é conferida aqui,
+    # depois do sleep, porque o Mestre pode ter encerrado enquanto o tempo passava.
+    if estado["fase"] != "aberta":
+        return
+    estado["toras"] += estado["producao"]
+    # Por quê: o estoque é de todos, então todas as abas veem a colheita;
+    # a causa "temporizador" mostra no Painel que ninguém pediu este fato.
+    await sio.emit("recurso.produzido", fato("temporizador", quantidade=estado["producao"]))
+
+
+async def ciclo_producao():
+    # Por quê: tarefa em segundo plano iniciada na abertura; repete a produção a
+    # cada INTERVALO_PRODUCAO segundos e para sozinha quando a temporada fecha.
+    while estado["fase"] == "aberta":
+        await sio.sleep(regras.INTERVALO_PRODUCAO)
+        await produzir_cevada()
+
+
+async def concluir_obra(obra_id):
+    # Por quê: revalida depois do sleep; com a temporada encerrada a obra fica
+    # congelada, e uma obra que já não existe não pode ser concluída duas vezes.
+    obra = estado["obras"].get(obra_id)
+    if estado["fase"] != "aberta" or obra is None:
+        return
+    del estado["obras"][obra_id]                      # o cervejeiro fica livre
+    estado["concluidas"] += 1
+    estado["producao"] += regras.GANHO_POR_OBRA
+    # Por quê: todas as abas trocam o canteiro pela construção pronta e veem a
+    # produção maior; a causa é o temporizador, não um pedido.
+    await sio.emit("construcao.concluida",
+                   fato("temporizador", obra={"id": obra_id, "tipo": obra["tipo"]}))
+
+
+async def esperar_obra(obra_id):
+    # Por quê: uma tarefa por obra; espera o tempo da obra e então tenta concluí-la.
+    await sio.sleep(regras.TEMPO_OBRA)
+    await concluir_obra(obra_id)

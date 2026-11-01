@@ -161,8 +161,8 @@ temporada não está aberta." e o Painel da outra aba não muda (Cenário 1).
 - [X] T035 [US2] Completar `motivo_recusa_construcao` em `regras.py` com as checagens na ordem de T031 até passar
 - [X] T036 [US1] Implementar `motivo_recusa_conexao` em `regras.py` e usá-la no `connect` de `server.py` (validar → se motivo: `await recusar(sid, "conexao", motivo)` e retornar sem registrar → registrar → emitir `estado.sincronizado`); fazer T032 e T034 passar
 - [X] T037 [US2] Em `client/index.html`, acrescentar `ouvir("operacao.recusada", "mostra o motivo só para quem pediu", (d) => { ... })`: `avisar(d.motivo, "erro")` e `jogo.recusado(d.motivo)`; se `d.pedido === "conexao"`, gravar o motivo em um novo `ref` `erroEntrada`, desconectar o socket e manter a tela de entrada; mostrar `erroEntrada` na tela de entrada (`<p v-if="erroEntrada" class="erro">`), com comentário de porquê
-- [ ] T038 [US2] Validar o Independent Test e a recusa do segundo Mestre com três abas; `pytest` verde
-- [ ] T039 [US2] Commit `feat(etapa 4): recusa só para quem pediu e Mestre único`
+- [X] T038 [US2] Validar o Independent Test e a recusa do segundo Mestre com três abas; `pytest` verde
+- [X] T039 [US2] Commit `feat(etapa 4): recusa só para quem pediu e Mestre único`
 
 ---
 
@@ -185,8 +185,8 @@ as abas; uma obra iniciada vira casa após 8 s, liberando o cervejeiro.
 - [ ] T044 [US3] Em `server.py`, implementar `async def concluir_obra(obra_id)` (revalida fase `"aberta"` e existência → remove obra, `concluidas += 1`, `producao += regras.GANHO_POR_OBRA` → emit `construcao.concluida`) e `async def esperar_obra(obra_id)` (`await sio.sleep(regras.TEMPO_OBRA)` → `await concluir_obra(obra_id)`), com comentários de porquê; fazer T041 passar
 - [ ] T045 [US3] Em `server.py`, chamar `sio.start_background_task(ciclo_producao)` depois do emit de `cervejaria.iniciada` e `sio.start_background_task(esperar_obra, obra_id)` depois do emit de `construcao.iniciada`; fazer T042 passar
 - [ ] T046 [US3] Em `client/index.html`, acrescentar `ouvir("recurso.produzido", "mostra a cevada colhida", (d) => { atualizar(d); jogo.recursoProduzido(d.estado); })` e `ouvir("construcao.concluida", "troca o canteiro pela construção pronta", (d) => { atualizar(d); jogo.obraConcluida(d.estado); })`, com comentários de porquê
-- [ ] T047 [US3] Validar o Independent Test (Cenário 2) com duas abas; `pytest` verde
-- [ ] T048 [US3] Commit `feat(etapa 5): passagem do tempo (produção e fim de obra)`
+- [X] T047 [US3] Validar o Independent Test (Cenário 2) com duas abas; `pytest` verde
+- [X] T048 [US3] Commit `feat(etapa 5): passagem do tempo (produção e fim de obra)`
 
 ---
 

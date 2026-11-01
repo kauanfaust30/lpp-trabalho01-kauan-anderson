@@ -221,3 +221,100 @@ def test_depois_que_o_mestre_sai_outro_mestre_entra(servidor):
 
     assert servidor.server.estado["mestre_sid"] == "m2"
     assert servidor.emitidos[0][0] == "estado.sincronizado"
+
+
+# ----- Etapa 5: passagem do tempo -----
+
+def com_obra(servidor, obra_id=1, tipo="maltaria"):
+    servidor.server.estado["obras"][obra_id] = {
+        "id": obra_id, "tipo": tipo, "pedida_por": "Ana", "termina_em": 1008.0,
+    }
+
+
+def test_produzir_cevada_com_temporada_aberta(servidor):
+    servidor.server.estado["fase"] = "aberta"
+
+    servidor.rodar(servidor.server.produzir_cevada())
+
+    assert servidor.server.estado["toras"] == 160
+    assert len(servidor.emitidos) == 1
+    evento, dados, to = servidor.emitidos[0]
+    assert evento == "recurso.produzido"
+    assert to is None
+    assert dados["quantidade"] == 10
+    assert dados["causa"] == "temporizador"
+    assert dados["estado"]["toras"] == 160
+
+
+def test_produzir_cevada_fora_da_temporada_nao_faz_nada(servidor):
+    for fase in ("aguardando", "encerrada"):
+        servidor.server.estado["fase"] = fase
+
+        servidor.rodar(servidor.server.produzir_cevada())
+
+        assert servidor.server.estado["toras"] == 150
+        assert servidor.emitidos == []
+
+
+def test_concluir_obra_libera_cervejeiro_e_aumenta_producao(servidor):
+    servidor.server.estado["fase"] = "aberta"
+    com_obra(servidor)
+
+    servidor.rodar(servidor.server.concluir_obra(1))
+
+    estado = servidor.server.estado
+    assert estado["obras"] == {}
+    assert estado["concluidas"] == 1
+    assert estado["producao"] == 15
+    assert len(servidor.emitidos) == 1
+    evento, dados, to = servidor.emitidos[0]
+    assert evento == "construcao.concluida"
+    assert to is None
+    assert dados["obra"] == {"id": 1, "tipo": "maltaria"}
+    assert dados["causa"] == "temporizador"
+    assert dados["estado"]["trabalhadores"] == 0
+
+
+def test_concluir_obra_com_temporada_encerrada_nao_faz_nada(servidor):
+    servidor.server.estado["fase"] = "encerrada"
+    com_obra(servidor)
+
+    servidor.rodar(servidor.server.concluir_obra(1))
+
+    assert 1 in servidor.server.estado["obras"]
+    assert servidor.server.estado["producao"] == 10
+    assert servidor.emitidos == []
+
+
+def test_concluir_obra_inexistente_nao_faz_nada(servidor):
+    servidor.server.estado["fase"] = "aberta"
+
+    servidor.rodar(servidor.server.concluir_obra(99))
+
+    assert servidor.server.estado["concluidas"] == 0
+    assert servidor.emitidos == []
+
+
+def test_abertura_aceita_inicia_o_ciclo_de_producao(servidor):
+    conectar(servidor, "m1", "Kauan", "mestre")
+
+    servidor.rodar(servidor.server.abertura_solicitada("m1"))
+
+    assert servidor.tarefas == [(servidor.server.ciclo_producao, ())]
+
+
+def test_construcao_aceita_inicia_o_temporizador_da_obra(servidor):
+    temporada_aberta_com_jogador(servidor)
+
+    servidor.rodar(servidor.server.construcao_solicitada("s1", {"tipo": "maltaria"}))
+
+    assert servidor.tarefas == [(servidor.server.esperar_obra, (1,))]
+
+
+def test_recusas_nao_iniciam_temporizadores(servidor):
+    conectar(servidor, "s1", "Ana", "jogador")
+
+    servidor.rodar(servidor.server.abertura_solicitada("s1"))
+    servidor.rodar(servidor.server.construcao_solicitada("s1", {"tipo": "maltaria"}))
+
+    assert servidor.tarefas == []

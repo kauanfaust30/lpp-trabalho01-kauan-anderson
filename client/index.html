@@ -349,8 +349,20 @@
           jogo.recusado(d.motivo);
         });
 
-        // ETAPA 5: ouvir "recurso.produzido"     -> jogo.recursoProduzido(...)
-        //          e "construcao.concluida"      -> jogo.obraConcluida(...)
+        // Por quê: a colheita acontece sozinha no servidor (temporizador); o cliente
+        // não conta tempo nem soma cevada, só mostra o estoque que chegou.
+        ouvir("recurso.produzido", "mostra a cevada colhida", (d) => {
+          atualizar(d);
+          jogo.recursoProduzido(d.estado);
+        });
+
+        // Por quê: o fim da obra também é decidido pelo relógio do servidor; todas
+        // as abas trocam o canteiro pela construção pronta ao mesmo tempo.
+        ouvir("construcao.concluida", "troca o canteiro pela construção pronta", (d) => {
+          atualizar(d);
+          jogo.obraConcluida(d.estado);
+        });
+
         // ETAPA 6: ouvir "vila.encerrada"        -> jogo.vilaEncerrada()
       }
 
