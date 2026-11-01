@@ -15,6 +15,15 @@ pediu e, em disputa, só um pedido vence. O objetivo é mostrar um fluxo control
 
 **Documento base**: [docs/especificacao.md](../../docs/especificacao.md)
 
+## Clarifications
+
+### Session 2026-10-31
+
+- Q: Depois de encerrada, o Mestre pode abrir uma nova temporada sem reiniciar o servidor? → A: Não; "encerrada" é final, recomeçar exige reiniciar o servidor.
+- Q: Quantos participantes podem estar como Mestre ao mesmo tempo? → A: Só um por vez; um segundo Mestre é recusado e precisa entrar como Jogador.
+- Q: Ao encerrar a temporada, o que acontece com obras em andamento e lotes pendentes? → A: Tudo fica congelado como está; só `cervejaria.encerrada` é emitido.
+- Q: Quem pode pedir para engarrafar um lote: só Jogadores ou o Mestre também? → A: Só Jogadores; pedido do Mestre é recusado (mesma regra de construir).
+
 ## Visão geral
 
 Vários participantes acessam a mesma cervejaria ao mesmo tempo, de forma cooperativa: todos
@@ -92,6 +101,11 @@ duas abas mostram a mudança de fase ao mesmo tempo.
    temporada." e nada muda para os demais.
 4. **Given** a temporada já aberta, **When** o Mestre pede para abrir de novo, **Then** só ele
    recebe `operacao.recusada` ("A temporada já está aberta.").
+5. **Given** já existe um Mestre conectado, **When** outro participante tenta entrar como
+   Mestre, **Then** só ele recebe `operacao.recusada` ("Já existe um Mestre na cervejaria. Entre
+   como Jogador.") e não entra; os demais não recebem nada.
+6. **Given** o Mestre se desconectou, **When** outro participante entra como Mestre, **Then** a
+   entrada é aceita normalmente.
 
 ---
 
@@ -120,6 +134,8 @@ cervejeiros ocupados mudam em todas as abas.
    Aguarde a próxima colheita.").
 4. **Given** 2 de 2 cervejeiros ocupados, **When** o Jogador pede uma construção, **Then** só
    ele recebe `operacao.recusada` ("Nenhum cervejeiro livre. Aguarde uma obra terminar.").
+6. **Given** temporada aberta, **When** o Mestre emite `construcao.solicitada`, **Then** só ele
+   recebe `operacao.recusada` ("Apenas Jogadores podem construir.") e nada muda.
 5. **Given** 1 de 2 cervejeiros ocupados e cevada suficiente para uma obra, **When** os
    Jogadores A e B pedem ao mesmo tempo, **Then** todos recebem um único `construcao.iniciada`
    (de um deles), só o outro recebe `operacao.recusada`, e os ocupados ficam em 2 de 2.
@@ -172,6 +188,8 @@ ver a cerveja subir; repetir sem engarrafar e ver o lote sumir após 20 segundos
    **Then** só ele recebe `operacao.recusada` ("Este lote não está mais disponível.").
 5. **Given** um lote pronto, **When** dois Jogadores pedem para engarrafá-lo ao mesmo tempo,
    **Then** só um `lote.engarrafado` é emitido e o outro Jogador recebe `operacao.recusada`.
+6. **Given** um lote pronto, **When** o Mestre emite `engarrafamento.solicitado`, **Then** só ele
+   recebe `operacao.recusada` ("Apenas Jogadores podem engarrafar.") e o lote continua pendente.
 
 ---
 
@@ -196,6 +214,9 @@ abas mostram a temporada encerrada e nenhum novo fato de tempo aparece depois.
    `recurso.produzido`, `construcao.concluida`, `lote.pronto` ou `lote.perdido` é emitido depois.
 4. **Given** temporada aberta, **When** um Jogador pede para encerrar, **Then** só ele recebe
    `operacao.recusada` ("Apenas o Mestre pode encerrar a temporada.").
+5. **Given** temporada encerrada, **When** o Mestre emite `cervejaria.abertura_solicitada`,
+   **Then** só ele recebe `operacao.recusada` ("A temporada já foi encerrada. Reinicie o
+   servidor para começar outra.") e a fase continua encerrada.
 
 ---
 
@@ -224,12 +245,16 @@ fato correspondente com nome, horário, dados, causa e reação, e que o contado
 - Pedido de construção com cevada exatamente igual ao custo (50): aceito, e a cevada vai a 0.
 - Pedido de engarrafar um lote já perdido ou já engarrafado: recusado só para quem pediu.
 - Mestre pedindo para abrir uma temporada já aberta, ou encerrar uma não aberta: recusado.
-- Obra em andamento quando a temporada é encerrada: não gera conclusão nem lote depois do
-  encerramento.
+- Obra em andamento ou lote pendente quando a temporada é encerrada: ficam congelados e
+  continuam aparecendo como estavam; não geram conclusão, lote nem perda depois do encerramento.
 - Jogador desconectado durante uma obra: a obra continua e termina normalmente para os demais.
 - Participante que conecta no meio da temporada: recebe o estado atual, incluindo obras e lotes
   pendentes com o tempo restante.
 - Vários lotes pendentes ao mesmo tempo: cada um tem seu próprio prazo de 20 segundos.
+- Dois participantes tentando entrar como Mestre ao mesmo tempo, sem Mestre conectado: só um
+  entra como Mestre; o outro é recusado.
+- Mestre que se desconecta com a temporada aberta: a temporada continua; a vaga de Mestre fica
+  livre para outro participante.
 - Pedido com tipo de construção desconhecido ou lote inexistente: recusado com motivo claro.
 
 ## Requirements *(mandatory)*
@@ -237,7 +262,8 @@ fato correspondente com nome, horário, dados, causa e reação, e que o contado
 ### Functional Requirements
 
 - **FR-001**: O sistema MUST permitir que somente o Mestre abra e encerre a temporada,
-  recusando esses pedidos vindos de Jogadores.
+  recusando esses pedidos vindos de Jogadores. As fases seguem só a ordem não aberta → aberta →
+  encerrada; "encerrada" é final e qualquer pedido de abertura nela é recusado.
 - **FR-002**: O sistema MUST entregar o estado atual apenas ao participante que acabou de
   conectar.
 - **FR-003**: O sistema MUST aceitar um pedido de construção somente com a temporada aberta,
@@ -257,7 +283,9 @@ fato correspondente com nome, horário, dados, causa e reação, e que o contado
   e o lote ainda pendente, somando 1 à cerveja engarrafada e avisando todos.
 - **FR-010**: O sistema MUST descartar um lote não engarrafado no prazo e avisar todos.
 - **FR-011**: O sistema MUST recusar qualquer pedido de construir ou engarrafar após o
-  encerramento e MUST parar todas as contagens de tempo ao encerrar.
+  encerramento e MUST parar todas as contagens de tempo ao encerrar. Obras em andamento e lotes
+  pendentes ficam congelados como estão (sem conclusão, sem perda, sem engarrafamento) e o único
+  fato emitido no encerramento é `cervejaria.encerrada`.
 - **FR-012**: O cliente MUST apenas enviar pedidos e exibir os fatos recebidos; nenhuma regra é
   decidida no cliente.
 - **FR-013**: O sistema MUST mostrar, para cada evento emitido ou recebido pela aba, o nome, o
@@ -266,6 +294,11 @@ fato correspondente com nome, horário, dados, causa e reação, e que o contado
 - **FR-015**: O sistema MUST exibir o nome dos desenvolvedores no rodapé.
 - **FR-016**: O participante MUST poder escolher, ao entrar, se atua como Mestre ou Jogador e
   informar um nome de exibição.
+- **FR-017**: O sistema MUST permitir no máximo um Mestre conectado por vez; uma tentativa de
+  entrar como Mestre com outro já conectado MUST ser recusada só para quem tentou, com o motivo.
+  A vaga de Mestre é liberada quando o Mestre se desconecta.
+- **FR-018**: O sistema MUST aceitar pedidos de construir e de engarrafar somente de Jogadores;
+  os mesmos pedidos vindos do Mestre MUST ser recusados só para ele, com o motivo.
 
 ### Key Entities
 
@@ -298,8 +331,8 @@ fato correspondente com nome, horário, dados, causa e reação, e que o contado
 
 ## Assumptions
 
-- Não há login nem senha: o papel é escolhido ao entrar e não é verificado além disso; mais de um
-  participante pode escolher ser Mestre.
+- Não há login nem senha: o papel é escolhido ao entrar; a única verificação é a de haver no
+  máximo um Mestre conectado (FR-017).
 - Há uma única cervejaria compartilhada por todos os conectados; o estado vive só em memória e
   se perde ao reiniciar o servidor.
 - As três construções têm o mesmo custo, tempo e efeito; o tipo serve para identificação e
@@ -308,5 +341,4 @@ fato correspondente com nome, horário, dados, causa e reação, e que o contado
 - Uma temporada encerrada não pode ser reaberta na mesma execução; recomeçar exige reiniciar o
   servidor.
 - O lote perdido apenas desaparece; não reduz recursos nem gera multa.
-- Ao encerrar, obras e lotes pendentes ficam congelados como estão e não geram novos fatos.
 - Fora de escopo: login, banco de dados, publicação na internet, pagamento ou multa.
