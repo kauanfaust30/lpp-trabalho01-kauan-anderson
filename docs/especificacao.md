@@ -58,6 +58,7 @@ cervejeiro durante a obra e, ao terminar, aumenta a produção de cevada.
 - **R7.** Um lote que não for engarrafado dentro do prazo **passa do ponto** e é perdido.
 - **R8.** Ao encerrar a temporada, novos pedidos são recusados e as contagens param.
 - **R9.** Só pode haver um Mestre conectado por vez. Um segundo Mestre que tenta entrar é recusado, só ele, com o motivo.
+- **R10.** Depois de encerrada, o Mestre pode abrir uma nova temporada. Ela começa do zero (cevada, produção, cerveja, obras e lotes voltam aos valores iniciais) e nada da temporada anterior continua em andamento.
 
 ## 3. Tabela de eventos
 
@@ -121,6 +122,7 @@ O Mestre encerra e novas ações são recusadas.
 - **FR-012:** O sistema DEVE exibir o nome dos desenvolvedores no rodapé.
 - **FR-013 (dupla):** O sistema DEVE mostrar quantas vezes cada evento já ocorreu.
 - **FR-014:** O sistema DEVE recusar a entrada de um segundo Mestre enquanto já houver um Mestre conectado, informando o motivo apenas a quem tentou entrar.
+- **FR-015 (extra):** O sistema DEVE permitir ao Mestre abrir uma nova temporada depois de encerrada, reiniciando o estado e garantindo que temporizadores da temporada anterior não produzam nenhum fato na nova.
 
 ## 6. Cenários de teste
 
@@ -151,6 +153,11 @@ e, ao fim da obra, emite `construcao.concluida` para todos, com o cervejeiro liv
 **Dado** que já há um Mestre conectado,
 **quando** outro cliente tenta entrar como Mestre,
 **então** o servidor emite `operacao.recusada` apenas para esse cliente, com o motivo, e o Mestre original não é afetado.
+
+### Cenário 6 (extra): Reabertura
+**Dado** que a temporada foi encerrada com uma obra em andamento,
+**quando** o Mestre emite `cervejaria.abertura_solicitada`,
+**então** o servidor emite `cervejaria.iniciada` para todos com o estado reiniciado, e a obra da temporada anterior não gera `construcao.concluida` nem `lote.pronto` na nova.
 
 ## 7. Casos de borda
 
