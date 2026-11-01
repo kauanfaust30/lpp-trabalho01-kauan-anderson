@@ -268,7 +268,7 @@ def test_concluir_obra_libera_cervejeiro_e_aumenta_producao(servidor):
     assert estado["obras"] == {}
     assert estado["concluidas"] == 1
     assert estado["producao"] == 15
-    assert len(servidor.emitidos) == 1
+    # o primeiro fato é a conclusão; a partir da Etapa 8 vem também lote.pronto (ver T062)
     evento, dados, to = servidor.emitidos[0]
     assert evento == "construcao.concluida"
     assert to is None
@@ -442,3 +442,144 @@ def test_disputa_pela_ultima_cevada(servidor, monkeypatch):
     assert len(recusas) == 1
     assert recusas[0][1]["motivo"] == "Cevada insuficiente: faltam 50. Aguarde a próxima colheita."
     assert servidor.server.estado["toras"] == 0
+
+
+# ----- Etapa 8: lotes que passam do ponto -----
+
+def test_concluir_obra_cria_lote_e_avisa_depois_da_conclusao(servidor):
+    servidor.server.estado["fase"] = "aberta"
+    servidor.server.estado["proximo_id"] = 2          # a obra 1 já existe
+    com_obra(servidor)
+
+    servidor.rodar(servidor.server.concluir_obra(1))
+
+    assert servidor.server.estado["lotes"] == {2: {"id": 2, "obra_id": 1, "vence_em": 1020.0}}
+    assert servidor.server.estado["proximo_id"] == 3
+    assert [e[0] for e in servidor.emitidos] == ["construcao.concluida", "lote.pronto"]
+    _, dados, to = servidor.emitidos[1]
+    assert to is None
+    assert dados["lote"] == {"id": 2, "obra_id": 1}
+    assert dados["prazo"] == 20
+    assert dados["causa"] == "temporizador"
+    assert servidor.tarefas == [(servidor.server.esperar_prazo_lote, (2,))]
+
+
+def com_lote(servidor, lote_id=7):
+    servidor.server.estado["lotes"][lote_id] = {"id": lote_id, "obra_id": 1, "vence_em": 1020.0}
+
+
+def test_engarrafamento_aceito_soma_cerveja_e_avisa_todos(servidor):
+    temporada_aberta_com_jogador(servidor)
+    com_lote(servidor)
+
+    servidor.rodar(servidor.server.engarrafamento_solicitado("s1", {"lote": 7}))
+
+    assert servidor.server.estado["lotes"] == {}
+    assert servidor.server.estado["cerveja"] == 1
+    assert len(servidor.emitidos) == 1
+    evento, dados, to = servidor.emitidos[0]
+    assert evento == "lote.engarrafado"
+    assert to is None
+    assert dados["lote"] == {"id": 7}
+    assert dados["por"] == "Ana"
+    assert dados["estado"]["cerveja"] == 1
+
+
+def test_mestre_que_tenta_engarrafar_recebe_recusa_so_para_ele(servidor):
+    conectar(servidor, "m1", "Kauan", "mestre")
+    servidor.server.estado["fase"] = "aberta"
+    com_lote(servidor)
+    servidor.emitidos.clear()
+
+    servidor.rodar(servidor.server.engarrafamento_solicitado("m1", {"lote": 7}))
+
+    dados = unica_recusa(servidor, "m1")
+    assert dados["pedido"] == "engarrafamento.solicitado"
+    assert dados["motivo"] == "Apenas Jogadores podem engarrafar."
+    assert 7 in servidor.server.estado["lotes"]
+
+
+def test_engarrafar_lote_que_ja_saiu_e_recusado(servidor):
+    temporada_aberta_com_jogador(servidor)          # nenhum lote pendente
+
+    servidor.rodar(servidor.server.engarrafamento_solicitado("s1", {"lote": 7}))
+
+    assert unica_recusa(servidor, "s1")["motivo"] == "Este lote não está mais disponível."
+    assert servidor.server.estado["cerveja"] == 0
+
+
+def test_engarrafar_com_temporada_encerrada_e_recusado(servidor):
+    temporada_aberta_com_jogador(servidor)
+    com_lote(servidor)
+    servidor.server.estado["fase"] = "encerrada"
+
+    servidor.rodar(servidor.server.engarrafamento_solicitado("s1", {"lote": 7}))
+
+    assert unica_recusa(servidor, "s1")["motivo"] == "A temporada está encerrada."
+    assert 7 in servidor.server.estado["lotes"]
+
+
+def test_engarrafar_sem_dados_vira_recusa_de_lote(servidor):
+    for dados_do_pedido in (None, {}):
+        temporada_aberta_com_jogador(servidor)
+        com_lote(servidor)
+
+        servidor.rodar(servidor.server.engarrafamento_solicitado("s1", dados_do_pedido))
+
+        assert unica_recusa(servidor, "s1")["motivo"] == "Este lote não está mais disponível."
+        assert servidor.server.estado["cerveja"] == 0
+        assert 7 in servidor.server.estado["lotes"]
+
+
+def test_disputa_pelo_mesmo_lote(servidor, monkeypatch):
+    conectar(servidor, "a", "Ana", "jogador")
+    conectar(servidor, "b", "Bia", "jogador")
+    servidor.server.estado["fase"] = "aberta"
+    com_lote(servidor)
+    servidor.emitidos.clear()
+
+    async def emit_que_cede(evento, dados=None, to=None, **_):
+        await asyncio.sleep(0)                      # deixa o outro pedido tentar se intercalar
+        servidor.emitidos.append((evento, dados, to))
+
+    monkeypatch.setattr(servidor.server.sio, "emit", emit_que_cede)
+    engarrafar = servidor.server.engarrafamento_solicitado
+
+    async def os_dois_juntos():
+        await asyncio.gather(engarrafar("a", {"lote": 7}), engarrafar("b", {"lote": 7}))
+
+    servidor.rodar(os_dois_juntos())
+
+    nomes = [e[0] for e in servidor.emitidos]
+    assert nomes.count("lote.engarrafado") == 1
+    assert nomes.count("operacao.recusada") == 1
+    recusa = next(e for e in servidor.emitidos if e[0] == "operacao.recusada")
+    assert recusa[1]["motivo"] == "Este lote não está mais disponível."
+    assert servidor.server.estado["cerveja"] == 1
+
+
+def test_perder_lote_no_prazo_avisa_todos(servidor):
+    servidor.server.estado["fase"] = "aberta"
+    com_lote(servidor)
+
+    servidor.rodar(servidor.server.perder_lote(7))
+
+    assert servidor.server.estado["lotes"] == {}
+    assert len(servidor.emitidos) == 1
+    evento, dados, to = servidor.emitidos[0]
+    assert evento == "lote.perdido"
+    assert to is None
+    assert dados["lote"] == {"id": 7}
+    assert dados["causa"] == "temporizador"
+
+
+def test_perder_lote_ja_engarrafado_ou_com_temporada_encerrada_nao_faz_nada(servidor):
+    servidor.server.estado["fase"] = "aberta"
+    servidor.rodar(servidor.server.perder_lote(7))       # lote já saiu (engarrafado)
+
+    servidor.server.estado["fase"] = "encerrada"
+    com_lote(servidor)
+    servidor.rodar(servidor.server.perder_lote(7))       # congelado
+
+    assert servidor.emitidos == []
+    assert 7 in servidor.server.estado["lotes"]

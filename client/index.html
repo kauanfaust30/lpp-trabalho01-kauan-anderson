@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Vila em Tempo Real</title>
+  <title>Cervejaria Artesanal em Tempo Real</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 580px; margin: 24px auto; padding: 0 12px; }
     .cartao, .painel { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin: 12px 0; }
@@ -37,6 +37,9 @@
     .chip { display: inline-block; background: #eee; border-radius: 10px; padding: 1px 8px; margin: 0 4px 4px 0; font-size: 11px; }
     footer { margin-top: 32px; font-size: 13px; color: #666; }
     .erro-entrada { color: #c62828; font-weight: bold; }
+    .lista { list-style: none; padding: 0; margin: 6px 0; }
+    .lista li { padding: 4px 0; }
+    select { padding: 8px; border-radius: 6px; margin-right: 6px; }
   </style>
 </head>
 <body>
@@ -44,7 +47,7 @@
 
   <!-- Tela de entrada -->
   <section v-if="!conectado" class="cartao">
-    <h1>🏘️ Vila em Tempo Real</h1>
+    <h1>🍺 Cervejaria Artesanal</h1>
     <input v-model="nome" placeholder="Seu nome">
     <button @click="entrar('mestre')">Entrar como Mestre</button>
     <button @click="entrar('jogador')">Entrar como Jogador</button>
@@ -54,17 +57,32 @@
 
   <!-- Tela da vila -->
   <main v-else>
-    <h1>🏘️ Vila</h1>
+    <h1>🍺 Cervejaria Artesanal</h1>
     <p>{{ papel }}: <strong>{{ nome || "Anônimo" }}</strong> · Temporada: <strong>{{ estado.fase }}</strong></p>
 
-    <!-- A vila desenhada pelo Phaser aparece aqui -->
+    <!-- A cervejaria desenhada pelo Phaser aparece aqui -->
     <div id="jogo"></div>
 
+    <!-- Os campos internos vêm do kit: estado.toras = cevada; estado.trabalhadores = cervejeiros ocupados -->
     <section class="painel">
-      <p>🪵 Toras: <strong>{{ estado.toras }}</strong> (+{{ porMinuto }}/min)</p>
-      <p>👷 Trabalhadores: {{ estado.trabalhadores }}/{{ estado.limite }}
+      <p>🌾 Cevada: <strong>{{ estado.toras }}</strong> (+{{ porMinuto }}/min)</p>
+      <p>🧑‍🍳 Cervejeiros ocupados: {{ estado.trabalhadores }}/{{ estado.limite }}
         <progress :value="estado.trabalhadores" :max="estado.limite"></progress></p>
-      <p>🏠 Construções: {{ estado.concluidas }} concluídas, {{ estado.em_obra }} em obra</p>
+      <p>🏭 Construções: {{ estado.concluidas }} concluídas, {{ estado.em_obra }} em obra</p>
+      <p>🍺 Cerveja engarrafada: <strong>{{ estado.cerveja }}</strong></p>
+
+      <!-- Obras em andamento, com o tempo que falta (vem do servidor) -->
+      <ul class="lista" v-if="estado.obras.length">
+        <li v-for="o in estado.obras" :key="o.id">🏭 {{ o.tipo }} de {{ o.pedida_por }} — {{ o.restante }} s</li>
+      </ul>
+
+      <!-- Lotes pendentes: precisam ser engarrafados antes de passarem do ponto -->
+      <ul class="lista" v-if="estado.lotes.length">
+        <li v-for="l in estado.lotes" :key="l.id">
+          🍺 Lote {{ l.id }} — {{ l.restante }} s
+          <button v-if="papel === 'jogador'" @click="engarrafar(l.id)">Engarrafar</button>
+        </li>
+      </ul>
     </section>
 
     <section>
@@ -72,7 +90,14 @@
         <button @click="abrirVila">Abrir temporada</button>
         <button @click="encerrarVila">Encerrar temporada</button>
       </template>
-      <button v-else @click="construir">🔨 Construir (custo {{ estado.custo }} toras)</button>
+      <template v-else>
+        <select v-model="tipoObra">
+          <option value="maltaria">Maltaria</option>
+          <option value="tanque">Tanque de fermentação</option>
+          <option value="adega">Adega</option>
+        </select>
+        <button @click="construir">🔨 Construir (custo {{ estado.custo }} de cevada)</button>
+      </template>
     </section>
 
     <ul class="avisos">
@@ -258,7 +283,9 @@
       const estado = reactive({
         fase: "aguardando", toras: 0, trabalhadores: 0, limite: 0,
         producao: 0, intervalo: 0, tempo_obra: 0, custo: 0, concluidas: 0, em_obra: 0,
+        lotes: [], obras: [], cerveja: 0, prazo_lote: 0,
       });
+      const tipoObra = ref("maltaria");     // tipo escolhido no seletor (só para o pedido)
       const avisos = ref([]);
       const eventos = ref([]);              // linha do tempo do painel de eventos
       const contadores = reactive({});      // quantas vezes cada evento ocorreu
@@ -284,8 +311,9 @@
       function resumir(d) {                // transforma os dados do evento em texto curto
         if (!d) return "";
         const { estado: e, causa, ...resto } = d;
-        const partes = Object.entries(resto).map(([k, v]) => k + ": " + v);
-        if (e) partes.push("toras " + e.toras + ", trabalhadores " + e.trabalhadores + "/" + e.limite);
+        const partes = Object.entries(resto).map(([k, v]) =>
+          k + ": " + (typeof v === "object" ? JSON.stringify(v) : v));   // obra/lote são objetos
+        if (e) partes.push("cevada " + e.toras + ", cervejeiros " + e.trabalhadores + "/" + e.limite);
         return partes.join(" · ");
       }
       function registrar(sentido, nome, dados, reacao = "") {
@@ -373,6 +401,29 @@
           atualizar(d);
           jogo.vilaEncerrada();
         });
+
+        // ----- Evento próprio da dupla: lotes que passam do ponto (só Vue, sem mexer na cena) -----
+
+        // Por quê: o lote nasce no servidor quando uma obra termina; todas as abas
+        // passam a listá-lo (estado.lotes) e qualquer Jogador pode engarrafá-lo.
+        ouvir("lote.pronto", "lista o lote e avisa o prazo para engarrafar", (d) => {
+          atualizar(d);
+          avisar("🍺 Lote " + d.lote.id + " pronto: engarrafe em " + d.prazo + " s", "ok");
+        });
+
+        // Por quê: o servidor confirmou o engarrafamento (só um vence em disputa);
+        // todas as abas tiram o lote da lista e veem a cerveja somada.
+        ouvir("lote.engarrafado", "tira o lote da lista e soma a cerveja", (d) => {
+          atualizar(d);
+          avisar("🍾 Lote " + d.lote.id + " engarrafado por " + d.por + ".", "ok");
+        });
+
+        // Por quê: o prazo é contado pelo relógio do servidor; quando ele acaba sem
+        // engarrafamento, todas as abas veem o lote passar do ponto ao mesmo tempo.
+        ouvir("lote.perdido", "tira o lote da lista e avisa que passou do ponto", (d) => {
+          atualizar(d);
+          avisar("Lote " + d.lote.id + " passou do ponto e foi perdido.", "erro");
+        });
       }
 
       // ===== PEDIDOS (emit): o cliente PEDE algo ao servidor =====
@@ -384,8 +435,13 @@
       }
       function construir() {
         // Por quê: o cliente não gasta cevada nem ocupa cervejeiro por conta própria;
-        // ele só PEDE, e o servidor decide (a escolha do tipo entra na etapa 8).
-        pedir("construcao.solicitada", { tipo: "maltaria" });
+        // ele só PEDE (com o tipo escolhido no seletor), e o servidor decide.
+        pedir("construcao.solicitada", { tipo: tipoObra.value });
+      }
+      function engarrafar(id) {
+        // Por quê: o cliente não sabe se o lote ainda está pendente nem se outro
+        // Jogador já o engarrafou; ele só PEDE, e o servidor decide.
+        pedir("engarrafamento.solicitado", { lote: id });
       }
       function encerrarVila() {
         // Por quê: o Mestre não encerra sozinho na própria tela; ele PEDE, e o
@@ -394,7 +450,7 @@
       }
 
       return { nome, papel, conectado, erroEntrada, estado, avisos, eventosVisiveis, contadores, ocultarProducao, porMinuto,
-               entrar, abrirVila, construir, encerrarVila };
+               tipoObra, entrar, abrirVila, construir, encerrarVila, engarrafar };
     }
   }).mount("#app");
 </script>

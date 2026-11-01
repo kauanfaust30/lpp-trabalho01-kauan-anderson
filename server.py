@@ -151,13 +151,30 @@ async def concluir_obra(obra_id):
     obra = estado["obras"].get(obra_id)
     if estado["fase"] != "aberta" or obra is None:
         return
+    # todas as alterações antes do primeiro await (Princípio IV)
     del estado["obras"][obra_id]                      # o cervejeiro fica livre
     estado["concluidas"] += 1
     estado["producao"] += regras.GANHO_POR_OBRA
+    lote_id = criar_lote(obra_id)                     # cada obra gera um lote (FR-008)
     # Por quê: todas as abas trocam o canteiro pela construção pronta e veem a
     # produção maior; a causa é o temporizador, não um pedido.
     await sio.emit("construcao.concluida",
                    fato("temporizador", obra={"id": obra_id, "tipo": obra["tipo"]}))
+    # Por quê: o lote é de todos; qualquer Jogador pode engarrafá-lo, então todas as
+    # abas precisam ver que ele está pronto e quanto tempo têm (evento próprio da dupla).
+    await sio.emit("lote.pronto", fato("temporizador", lote={"id": lote_id, "obra_id": obra_id},
+                                       prazo=regras.PRAZO_LOTE))
+    # o lote passa do ponto sozinho se ninguém engarrafar a tempo (R7/FR-010)
+    sio.start_background_task(esperar_prazo_lote, lote_id)
+
+
+def criar_lote(obra_id):
+    """Cria um lote pendente para a obra concluída e devolve o id dele (síncrona)."""
+    lote_id = estado["proximo_id"]
+    estado["proximo_id"] += 1
+    estado["lotes"][lote_id] = {"id": lote_id, "obra_id": obra_id,
+                                "vence_em": agora() + regras.PRAZO_LOTE}
+    return lote_id
 
 
 async def esperar_obra(obra_id):
@@ -186,3 +203,43 @@ async def encerramento_solicitado(sid):
     # Por quê: todas as abas precisam saber que a temporada acabou e que novos
     # pedidos serão recusados; é o único fato emitido no encerramento.
     await sio.emit("cervejaria.encerrada", fato(causa_pedido(sid)))
+
+
+# ----- Etapa 8: lotes que passam do ponto (evento próprio da dupla) -----
+
+@sio.on("engarrafamento.solicitado")
+async def engarrafamento_solicitado(sid, dados=None):
+    # Por quê: engarrafar é um PEDIDO do Jogador; só o servidor sabe se o lote ainda
+    # está pendente, então é ele quem decide (e, em disputa, só um engarrafa).
+    lote_id = (dados or {}).get("lote")    # pedido sem dados não quebra: vira recusa
+    participante = estado["participantes"].get(sid)
+    # 1. validar (sem await até o estado mudar)
+    motivo = regras.motivo_recusa_engarrafamento(estado, participante, lote_id)
+    # 2. recusar só para quem pediu
+    if motivo:
+        await recusar(sid, "engarrafamento.solicitado", motivo)
+        return
+    # 3. alterar o estado: o lote sai dos pendentes e vira cerveja engarrafada
+    del estado["lotes"][lote_id]
+    estado["cerveja"] += regras.CERVEJA_POR_LOTE
+    # 4. emitir o fato
+    # Por quê: todas as abas tiram o lote da lista e veem a cerveja somada.
+    await sio.emit("lote.engarrafado",
+                   fato(causa_pedido(sid), lote={"id": lote_id}, por=participante["nome"]))
+
+
+async def perder_lote(lote_id):
+    # Por quê: revalida depois do sleep; lote já engarrafado não se perde, e com a
+    # temporada encerrada o lote fica congelado.
+    if estado["fase"] != "aberta" or lote_id not in estado["lotes"]:
+        return
+    del estado["lotes"][lote_id]
+    # Por quê: o prazo acabou sem ninguém engarrafar; todas as abas veem o lote
+    # passar do ponto, e a causa é o temporizador.
+    await sio.emit("lote.perdido", fato("temporizador", lote={"id": lote_id}))
+
+
+async def esperar_prazo_lote(lote_id):
+    # Por quê: uma tarefa por lote; espera o prazo e então tenta descartar o lote.
+    await sio.sleep(regras.PRAZO_LOTE)
+    await perder_lote(lote_id)

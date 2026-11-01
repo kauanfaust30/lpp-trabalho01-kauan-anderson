@@ -279,3 +279,46 @@ def test_nao_encerra_temporada_ja_encerrada():
     motivo = regras.motivo_recusa_encerramento(estado_na_fase("encerrada"), MESTRE)
 
     assert motivo == "A temporada já está encerrada."
+
+
+# ----- Etapa 8: engarrafar um lote -----
+
+def estado_com_lote_pendente(fase="aberta"):
+    estado = estado_na_fase(fase)
+    estado["lotes"][7] = {"id": 7, "obra_id": 1, "vence_em": 120.0}
+    return estado
+
+
+def test_jogador_pode_engarrafar_lote_pendente():
+    assert regras.motivo_recusa_engarrafamento(estado_com_lote_pendente(), JOGADOR, 7) is None
+
+
+def test_engarrafamento_por_quem_nao_esta_na_cervejaria():
+    motivo = regras.motivo_recusa_engarrafamento(estado_com_lote_pendente(), None, 7)
+
+    assert motivo == "Você não está na cervejaria. Entre novamente."
+
+
+def test_mestre_nao_pode_engarrafar():
+    motivo = regras.motivo_recusa_engarrafamento(estado_com_lote_pendente(), MESTRE, 7)
+
+    assert motivo == "Apenas Jogadores podem engarrafar."
+
+
+def test_nao_engarrafa_antes_de_abrir():
+    motivo = regras.motivo_recusa_engarrafamento(estado_com_lote_pendente("aguardando"), JOGADOR, 7)
+
+    assert motivo == "A temporada não está aberta."
+
+
+def test_nao_engarrafa_depois_de_encerrar():
+    motivo = regras.motivo_recusa_engarrafamento(estado_com_lote_pendente("encerrada"), JOGADOR, 7)
+
+    assert motivo == "A temporada está encerrada."
+
+
+def test_lote_ausente_nao_esta_mais_disponivel():
+    for lote_id in (99, None):
+        motivo = regras.motivo_recusa_engarrafamento(estado_com_lote_pendente(), JOGADOR, lote_id)
+
+        assert motivo == "Este lote não está mais disponível."

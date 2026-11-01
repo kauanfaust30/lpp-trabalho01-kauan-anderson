@@ -101,6 +101,20 @@ def motivo_recusa_construcao(estado, participante, tipo):
     return None
 
 
+def motivo_recusa_engarrafamento(estado, participante, lote_id):
+    """Por que o pedido de engarrafar deve ser recusado, ou None se pode engarrafar."""
+    if participante is None:
+        return MOTIVO_NAO_REGISTRADO
+    if participante["papel"] != "jogador":
+        return "Apenas Jogadores podem engarrafar."
+    motivo_fase = motivo_recusa_fase(estado)
+    if motivo_fase:
+        return motivo_fase
+    if lote_id not in estado["lotes"]:
+        return "Este lote não está mais disponível."
+    return None
+
+
 def motivo_recusa_conexao(estado, papel):
     """Por que a entrada deve ser recusada, ou None: só pode haver um Mestre por vez."""
     if papel == "mestre" and estado["mestre_sid"] is not None:
