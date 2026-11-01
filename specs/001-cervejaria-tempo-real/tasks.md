@@ -237,7 +237,7 @@ dados, causa e reação (FR-013); rodapé com os nomes (FR-015, feito na etapa 0
 
 - [X] T058 [US6] Em `client/index.html`, no lugar do comentário `<!-- ETAPA 7 (dupla): cole aqui os contadores por evento -->`, mostrar `<p class="legenda">` com `<span class="chip" v-for="(qtd, nome) in contadores" :key="nome">{{ nome }}: {{ qtd }}</span>` (o kit já incrementa `contadores` em `registrar`)
 - [X] T059 [US6] Validar o Independent Test, conferir que cada linha do Painel mostra a causa e conferir o rodapé "Kauan Faust e Anderson Moreira"; `pytest` verde
-- [ ] T060 [US6] Commit `feat(etapa 7): contadores por evento no Painel`
+- [X] T060 [US6] Commit `feat(etapa 7): contadores por evento no Painel`
 
 ---
 
@@ -266,7 +266,7 @@ cerveja subir 1; repetir sem engarrafar e ver o lote sumir após 20 s (Cenário 
 - [X] T070 [US4] Em `client/index.html`, adicionar um `<select v-model="tipoObra">` com `maltaria`, `tanque` (Tanque de fermentação) e `adega` ao lado do botão Construir e passar `{ tipo: tipoObra.value }` em `construir()`
 - [X] T071 [US4] Em `client/index.html`, trocar só os textos exibidos (mantendo os campos internos): `<title>` e títulos para "🍺 Cervejaria Artesanal"; "🪵 Toras" → "🌾 Cevada" (`estado.toras`); "👷 Trabalhadores" → "🧑‍🍳 Cervejeiros ocupados" (`estado.trabalhadores`/`estado.limite`); "🏠 Construções" → "🏭 Construções"; botão "custo {{ estado.custo }} de cevada"; nova linha "🍺 Cerveja engarrafada: {{ estado.cerveja }}"; em `resumir`, o texto `"toras ... trabalhadores ..."` → `"cevada " + e.toras + ", cervejeiros " + e.trabalhadores + "/" + e.limite`
 - [X] T072 [US4] Validar o Independent Test (Cenário 4 e disputa de engarrafamento) com duas abas; `pytest` verde
-- [ ] T073 [US4] Commit `feat(etapa 8): adaptação à cervejaria e lotes que passam do ponto`
+- [X] T073 [US4] Commit `feat(etapa 8): adaptação à cervejaria e lotes que passam do ponto`
 
 ---
 
