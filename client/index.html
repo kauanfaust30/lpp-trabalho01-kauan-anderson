@@ -86,7 +86,11 @@
         <span class="badge emit">⬆ emit</span> este cliente PEDIU algo ao servidor ·
         <span class="badge on">⬇ on</span> este cliente ESCUTOU um evento e reagiu
       </p>
-      <!-- ETAPA 7 (dupla): cole aqui os contadores por evento -->
+      <!-- Contadores por evento (FR-014): quantas vezes cada evento foi emitido ou escutado
+           por esta aba. O kit já conta em `contadores`, dentro de registrar(). -->
+      <p class="legenda">
+        <span class="chip" v-for="(qtd, nome) in contadores" :key="nome">{{ nome }}: {{ qtd }}</span>
+      </p>
       <label><input type="checkbox" v-model="ocultarProducao"> ocultar recurso.produzido (é muito frequente)</label>
       <ul>
         <li v-for="e in eventosVisiveis" :class="e.tipo">
