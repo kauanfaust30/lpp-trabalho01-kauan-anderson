@@ -1,6 +1,6 @@
 # Implementation Plan: Cervejaria Artesanal em Tempo Real
 
-**Branch**: `001-cervejaria-tempo-real` (trabalho na `main`) | **Date**: 2026-11-01 |
+**Branch**: `main` | **Date**: 2026-11-01 |
 **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/001-cervejaria-tempo-real/spec.md`

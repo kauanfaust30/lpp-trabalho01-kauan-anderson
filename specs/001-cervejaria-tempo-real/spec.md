@@ -1,6 +1,6 @@
 # Feature Specification: Cervejaria Artesanal em Tempo Real
 
-**Feature Branch**: `main` (sem branch dedicada)
+**Feature Branch**: `main`
 
 **Created**: 2026-10-31
 

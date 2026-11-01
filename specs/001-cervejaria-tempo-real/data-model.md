@@ -17,7 +17,7 @@ altera nada. Os nomes de campo lidos pelo kit (`client/index.html`) são mantido
 | `tempo_obra` | segundos de uma obra | kit |
 | `concluidas` | obras concluídas | kit |
 | `em_obra` | obras em andamento | kit |
-| `fase` | fase da temporada | kit |
+| `fase` | fase da temporada: `"aguardando"` (= "não aberta" na spec), `"aberta"`, `"encerrada"` | kit |
 | `cerveja` | cerveja engarrafada | novo |
 | `prazo_lote` | segundos para engarrafar um lote | novo |
 | `obras` / `lotes` | listas de obras em andamento / lotes pendentes | novo |
