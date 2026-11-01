@@ -301,14 +301,22 @@
       function entrar(p) {
         papel.value = p;
         socket = io({ auth: { nome: nome.value || "Anônimo", papel: p } });
-        socket.on("connect", () => {
-          conectado.value = true;
-          nextTick(() => jogo.iniciar("jogo"));   // a vila desenhada começa quando a tela aparece
-        });
 
         // ===== ESCUTAS (on): o cliente reage aos FATOS do servidor =====
         // ouvir(evento, "o que o cliente faz ao receber", função)
-        // ETAPA 1: ouvir "estado.sincronizado"   -> jogo.mostrarEstado(...)
+
+        // Por quê: o servidor é a fonte da verdade; só depois de receber o estado
+        // dele a aba entra na tela da cervejaria e desenha o que já existe.
+        // (Antes isso acontecia no "connect"; agora só entra quem o servidor aceitou.)
+        ouvir("estado.sincronizado", "copia o estado e desenha a cervejaria", (d) => {
+          atualizar(d);
+          conectado.value = true;
+          nextTick(() => {
+            jogo.iniciar("jogo");             // a cena começa quando a tela aparece
+            jogo.mostrarEstado(d.estado);
+          });
+        });
+
         // ETAPA 2: ouvir "vila.iniciada"         -> jogo.vilaIniciada()
         // ETAPA 3: ouvir "construcao.iniciada"   -> jogo.obraIniciada(...)
         // ETAPA 4: ouvir "operacao.recusada"     -> jogo.recusado(...)
