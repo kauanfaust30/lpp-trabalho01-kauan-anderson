@@ -249,3 +249,33 @@ def test_segundo_mestre_e_recusado():
     motivo = regras.motivo_recusa_conexao(estado, "mestre")
 
     assert motivo == "Já existe um Mestre na cervejaria. Entre como Jogador."
+
+
+# ----- Etapa 6: encerrar a temporada -----
+
+def test_mestre_pode_encerrar_temporada_aberta():
+    assert regras.motivo_recusa_encerramento(estado_na_fase("aberta"), MESTRE) is None
+
+
+def test_encerramento_por_quem_nao_esta_na_cervejaria():
+    motivo = regras.motivo_recusa_encerramento(estado_na_fase("aberta"), None)
+
+    assert motivo == "Você não está na cervejaria. Entre novamente."
+
+
+def test_jogador_nao_pode_encerrar():
+    motivo = regras.motivo_recusa_encerramento(estado_na_fase("aberta"), JOGADOR)
+
+    assert motivo == "Apenas o Mestre pode encerrar a temporada."
+
+
+def test_nao_encerra_temporada_que_nao_abriu():
+    motivo = regras.motivo_recusa_encerramento(estado_na_fase("aguardando"), MESTRE)
+
+    assert motivo == "A temporada ainda não foi aberta."
+
+
+def test_nao_encerra_temporada_ja_encerrada():
+    motivo = regras.motivo_recusa_encerramento(estado_na_fase("encerrada"), MESTRE)
+
+    assert motivo == "A temporada já está encerrada."

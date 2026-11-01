@@ -363,7 +363,12 @@
           jogo.obraConcluida(d.estado);
         });
 
-        // ETAPA 6: ouvir "vila.encerrada"        -> jogo.vilaEncerrada()
+        // Por quê: o fim da temporada vale para todos; cada aba só escurece a cena
+        // quando o servidor confirma, e a partir daí os pedidos serão recusados por ele.
+        ouvir("cervejaria.encerrada", "mostra a temporada encerrada e escurece a cena", (d) => {
+          atualizar(d);
+          jogo.vilaEncerrada();
+        });
       }
 
       // ===== PEDIDOS (emit): o cliente PEDE algo ao servidor =====
@@ -379,7 +384,9 @@
         pedir("construcao.solicitada", { tipo: "maltaria" });
       }
       function encerrarVila() {
-        // ETAPA 6: pedir "vila.encerramento_solicitado"
+        // Por quê: o Mestre não encerra sozinho na própria tela; ele PEDE, e o
+        // servidor decide e avisa todos com "cervejaria.encerrada".
+        pedir("cervejaria.encerramento_solicitado");
       }
 
       return { nome, papel, conectado, erroEntrada, estado, avisos, eventosVisiveis, contadores, ocultarProducao, porMinuto,

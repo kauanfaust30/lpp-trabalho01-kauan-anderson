@@ -164,3 +164,25 @@ async def esperar_obra(obra_id):
     # Por quê: uma tarefa por obra; espera o tempo da obra e então tenta concluí-la.
     await sio.sleep(regras.TEMPO_OBRA)
     await concluir_obra(obra_id)
+
+
+# ----- Etapa 6: encerramento -----
+
+@sio.on("cervejaria.encerramento_solicitado")
+async def encerramento_solicitado(sid):
+    # Por quê: encerrar é um PEDIDO do Mestre; o servidor confere papel e fase (R1, R8).
+    # 1. validar (sem await até o estado mudar)
+    motivo = regras.motivo_recusa_encerramento(estado, estado["participantes"].get(sid))
+    # 2. recusar só para quem pediu
+    if motivo:
+        await recusar(sid, "cervejaria.encerramento_solicitado", motivo)
+        return
+    # 3. alterar o estado: a fase "encerrada" é final; guardar o instante congela os
+    #    tempos restantes de obras e lotes, e os temporizadores param sozinhos ao
+    #    conferirem a fase depois do sleep
+    estado["fase"] = "encerrada"
+    estado["encerrada_em"] = agora()
+    # 4. emitir o fato
+    # Por quê: todas as abas precisam saber que a temporada acabou e que novos
+    # pedidos serão recusados; é o único fato emitido no encerramento.
+    await sio.emit("cervejaria.encerrada", fato(causa_pedido(sid)))

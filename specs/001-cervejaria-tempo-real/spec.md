@@ -19,10 +19,14 @@ pediu e, em disputa, só um pedido vence. O objetivo é mostrar um fluxo control
 
 ### Session 2026-10-31
 
-- Q: Depois de encerrada, o Mestre pode abrir uma nova temporada sem reiniciar o servidor? → A: Não; "encerrada" é final, recomeçar exige reiniciar o servidor.
+- Q: Depois de encerrada, o Mestre pode abrir uma nova temporada sem reiniciar o servidor? → A: Não; "encerrada" é final, recomeçar exige reiniciar o servidor. **(Substituída em 2026-11-01 — ver abaixo.)**
 - Q: Quantos participantes podem estar como Mestre ao mesmo tempo? → A: Só um por vez; um segundo Mestre é recusado e precisa entrar como Jogador.
 - Q: Ao encerrar a temporada, o que acontece com obras em andamento e lotes pendentes? → A: Tudo fica congelado como está; só `cervejaria.encerrada` é emitido.
 - Q: Quem pode pedir para engarrafar um lote: só Jogadores ou o Mestre também? → A: Só Jogadores; pedido do Mestre é recusado (mesma regra de construir).
+
+### Session 2026-11-01 (mudança de requisito)
+
+- Q: Depois de encerrada, o Mestre pode abrir uma nova temporada? → A: Sim (R10, FR-015 e Cenário 6 de `docs/especificacao.md`). Reaproveita `cervejaria.abertura_solicitada`/`cervejaria.iniciada`; o estado recomeça do zero, mantendo os participantes e o Mestre, e nenhum temporizador da temporada anterior gera fato na nova. Ver FR-019.
 
 ## Visão geral
 
@@ -74,7 +78,7 @@ Convenção de nomes: `objeto.acao_solicitada` para o pedido do cliente e
 | `lote.engarrafado` | fato | Servidor | Todos | Lote sai da lista de pendentes; cerveja +1 |
 | `lote.perdido` | fato | Servidor (tempo) | Todos | Prazo esgotado; lote descartado |
 | `cervejaria.encerramento_solicitado` | pedido | Mestre | Servidor | Pedido para encerrar a temporada |
-| `cervejaria.encerrada` | fato | Servidor | Todos | Temporada encerrada; novas ações recusadas |
+| `cervejaria.encerrada` | fato | Servidor | Todos | Temporada encerrada; novas ações recusadas (o Mestre pode reabrir com `cervejaria.abertura_solicitada`) |
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -214,9 +218,13 @@ abas mostram a temporada encerrada e nenhum novo fato de tempo aparece depois.
    `recurso.produzido`, `construcao.concluida`, `lote.pronto` ou `lote.perdido` é emitido depois.
 4. **Given** temporada aberta, **When** um Jogador pede para encerrar, **Then** só ele recebe
    `operacao.recusada` ("Apenas o Mestre pode encerrar a temporada.").
-5. **Given** temporada encerrada, **When** o Mestre emite `cervejaria.abertura_solicitada`,
-   **Then** só ele recebe `operacao.recusada` ("A temporada já foi encerrada. Reinicie o
-   servidor para começar outra.") e a fase continua encerrada.
+5. **Given** temporada encerrada com uma obra em andamento, **When** o Mestre emite
+   `cervejaria.abertura_solicitada`, **Then** todos recebem `cervejaria.iniciada` com o estado
+   reiniciado (cevada 150, produção 10, cerveja 0, sem obras nem lotes) e a obra da temporada
+   anterior não gera `construcao.concluida` nem `lote.pronto` na nova (Cenário 6 da
+   especificação).
+6. **Given** temporada encerrada, **When** um Jogador emite `cervejaria.abertura_solicitada`,
+   **Then** só ele recebe `operacao.recusada` ("Apenas o Mestre pode abrir a temporada.").
 
 ---
 
@@ -247,6 +255,9 @@ fato correspondente com nome, horário, dados, causa e reação, e que o contado
 - Mestre pedindo para abrir uma temporada já aberta, ou encerrar uma não aberta: recusado.
 - Obra em andamento ou lote pendente quando a temporada é encerrada: ficam congelados e
   continuam aparecendo como estavam; não geram conclusão, lote nem perda depois do encerramento.
+- Reabertura logo depois do encerramento, com temporizadores da temporada anterior ainda
+  dormindo (obra, lote ou produção): ao acordarem, eles não fazem nada na temporada nova, mesmo
+  que exista uma obra ou um lote novo com o mesmo identificador.
 - Jogador desconectado durante uma obra: a obra continua e termina normalmente para os demais.
 - Participante que conecta no meio da temporada: recebe o estado atual, incluindo obras e lotes
   pendentes com o tempo restante.
@@ -262,8 +273,8 @@ fato correspondente com nome, horário, dados, causa e reação, e que o contado
 ### Functional Requirements
 
 - **FR-001**: O sistema MUST permitir que somente o Mestre abra e encerre a temporada,
-  recusando esses pedidos vindos de Jogadores. As fases seguem só a ordem não aberta → aberta →
-  encerrada; "encerrada" é final e qualquer pedido de abertura nela é recusado.
+  recusando esses pedidos vindos de Jogadores. As fases seguem a ordem não aberta → aberta →
+  encerrada → (reaberta, ver FR-019) aberta; abrir com a temporada já aberta é recusado.
 - **FR-002**: O sistema MUST entregar o estado atual apenas ao participante que acabou de
   conectar.
 - **FR-003**: O sistema MUST aceitar um pedido de construção somente com a temporada aberta,
@@ -299,6 +310,11 @@ fato correspondente com nome, horário, dados, causa e reação, e que o contado
   A vaga de Mestre é liberada quando o Mestre se desconecta.
 - **FR-018**: O sistema MUST aceitar pedidos de construir e de engarrafar somente de Jogadores;
   os mesmos pedidos vindos do Mestre MUST ser recusados só para ele, com o motivo.
+- **FR-019** (= R10 e FR-015 de `docs/especificacao.md`): O sistema MUST permitir ao Mestre abrir
+  uma nova temporada depois de encerrada, com os mesmos eventos (`cervejaria.abertura_solicitada`
+  → `cervejaria.iniciada`). A nova temporada MUST recomeçar do zero (cevada, produção, cerveja,
+  obras e lotes voltam aos valores iniciais), mantendo os participantes conectados e o Mestre; os
+  temporizadores da temporada anterior MUST NOT produzir nenhum fato na nova.
 
 ### Key Entities
 
@@ -338,7 +354,7 @@ fato correspondente com nome, horário, dados, causa e reação, e que o contado
 - As três construções têm o mesmo custo, tempo e efeito; o tipo serve para identificação e
   exibição.
 - Toda obra concluída gera exatamente um lote, independentemente do tipo.
-- Uma temporada encerrada não pode ser reaberta na mesma execução; recomeçar exige reiniciar o
-  servidor.
+- Uma temporada encerrada pode ser reaberta pelo Mestre (FR-019); a reabertura recomeça a
+  cervejaria do zero, mas quem está conectado continua conectado, com o mesmo papel.
 - O lote perdido apenas desaparece; não reduz recursos nem gera multa.
 - Fora de escopo: login, banco de dados, publicação na internet, pagamento ou multa.

@@ -88,8 +88,30 @@ Todo handler de pedido segue a mesma sequência, sem `await` antes do passo 3 te
 5. comentário do porquê em cada @sio.on e cada sio.emit
 ```
 
-Os temporizadores seguem o mesmo padrão: `await sio.sleep(...)` → revalidar (fase aberta, item
-ainda existe) → alterar → `emit`.
+Os temporizadores seguem o mesmo padrão: `await sio.sleep(...)` → revalidar (mesma temporada,
+fase aberta, item ainda existe) → alterar → `emit`.
+
+## Reabertura da temporada (FR-019 — mudança de requisito de 2026-11-01)
+
+- **Mesmos eventos**: `cervejaria.abertura_solicitada` → `cervejaria.iniciada` (com o campo
+  extra `reaberta: true`). Nenhum evento novo.
+- **Regra** (`regras.py`): `motivo_recusa_abertura` passa a aceitar a fase `"encerrada"` para o
+  Mestre; continua recusando `"aberta"` ("A temporada já está aberta.") e quem não é Mestre.
+  `estado_inicial()` ganha o campo interno `temporada = 0` (fora do retrato).
+- **Handler** (`server.py`, `abertura_solicitada`): validar → recusar → se a fase era
+  `"encerrada"`, reiniciar o estado no mesmo dicionário com `regras.estado_inicial()`,
+  preservando `participantes`, `mestre_sid` e `temporada` → `temporada += 1`, `fase = "aberta"`
+  → emitir `cervejaria.iniciada` → iniciar `ciclo_producao(temporada)`. Sem `await` entre validar
+  e terminar a reinicialização.
+- **Temporizadores**: `ciclo_producao(temporada)`, `esperar_obra(obra_id, temporada)` e
+  `esperar_prazo_lote(lote_id, temporada)` recebem o número da temporada ao nascer e, ao acordar,
+  não fazem nada se `estado["temporada"]` mudou. Sem isso, uma obra antiga de id 1 poderia
+  concluir a obra nova de id 1, já que `proximo_id` volta a 1.
+- **Cliente** (Vue, sem alterar `criarJogo` nem a cena Phaser): ao ouvir `cervejaria.iniciada`
+  com `reaberta: true`, limpa o `#jogo`, cria uma cena nova com `jogo = criarJogo()` (o `jogo`
+  passa de `const` para `let`), chama `jogo.iniciar("jogo")` e `jogo.mostrarEstado(d.estado)`.
+  Limitação aceita: a instância Phaser antiga não é destruída (não há acesso a ela sem mudar
+  `criarJogo`); só o canvas dela sai da página.
 
 ## Constitution Check
 

@@ -52,6 +52,7 @@ altera nada. Os nomes de campo lidos pelo kit (`client/index.html`) são mantido
 | `mestre_sid` | str \| None | None | no máximo um (FR-017; não vai no retrato) |
 | `encerrada_em` | float \| None | None | congela os tempos restantes |
 | `proximo_id` | int | 1 | gera ids de obras e lotes |
+| `temporada` | int | 0 | +1 a cada abertura aceita (1ª abertura → 1); identifica a temporada dos temporizadores; **interno, não vai no retrato** |
 
 Derivados no retrato: `trabalhadores = em_obra = len(obras)`.
 
@@ -59,11 +60,25 @@ Derivados no retrato: `trabalhadores = em_obra = len(obras)`.
 
 ```text
 aguardando --(Mestre: abertura_solicitada)--> aberta --(Mestre: encerramento_solicitado)--> encerrada
+                                                ^                                            |
+                                                +------(Mestre: abertura_solicitada)---------+
+                                                         (reabertura: reinicia o estado)
 ```
 
-- "encerrada" é final (clarificação): abrir nela é recusado.
 - Abrir em "aberta" é recusado; encerrar em "aguardando" ou "encerrada" é recusado.
 - Ao encerrar: `encerrada_em = agora`; obras e lotes ficam como estão (congelados).
+- **Reabertura** (abrir com fase `"encerrada"`, FR-019): o estado é trocado por
+  `regras.estado_inicial()` **mantendo `participantes`, `mestre_sid` e `temporada`**; depois,
+  como em toda abertura aceita, `temporada += 1` e `fase = "aberta"`. A troca é feita no mesmo
+  dicionário (`estado.clear(); estado.update(novo)`), sem `await` entre validar e reiniciar.
+
+### Temporizadores e número da temporada
+
+`ciclo_producao`, `esperar_obra` e `esperar_prazo_lote` recebem, ao nascer, o número da
+temporada em que foram criados (argumento de `sio.start_background_task`). Ao acordar do
+`sleep`, se `estado["temporada"]` for diferente desse número, **não fazem nada**: isso impede
+que um temporizador da temporada anterior conclua uma obra (ou perca um lote) da temporada nova
+que tenha o mesmo id, já que `proximo_id` volta a 1 na reabertura.
 
 ## Participante
 
@@ -120,3 +135,5 @@ obras: [{id, tipo, pedida_por, restante}], lotes: [{id, obra_id, restante}]
 
 `restante` = segundos (inteiro arredondado para cima, ≥ 0) até `termina_em`/`vence_em`, medidos
 a partir de `encerrada_em` se a temporada estiver encerrada, senão a partir de `agora`.
+
+Não vão no retrato: `participantes`, `mestre_sid`, `encerrada_em`, `proximo_id` e `temporada`.

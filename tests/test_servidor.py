@@ -1,5 +1,7 @@
 """Testes dos handlers e temporizadores do server.py (usam a fixture `servidor`)."""
 
+import asyncio
+
 
 def conectar(servidor, sid, nome="Ana", papel="jogador"):
     servidor.rodar(servidor.server.connect(sid, {}, {"nome": nome, "papel": papel}))
@@ -318,3 +320,125 @@ def test_recusas_nao_iniciam_temporizadores(servidor):
     servidor.rodar(servidor.server.construcao_solicitada("s1", {"tipo": "maltaria"}))
 
     assert servidor.tarefas == []
+
+
+# ----- Etapa 6: encerramento -----
+
+def temporada_aberta_com_mestre_e_jogador(servidor):
+    conectar(servidor, "m1", "Kauan", "mestre")
+    conectar(servidor, "s1", "Ana", "jogador")
+    servidor.server.estado["fase"] = "aberta"
+    servidor.emitidos.clear()
+
+
+def test_mestre_encerra_e_todos_recebem_cervejaria_encerrada(servidor):
+    temporada_aberta_com_mestre_e_jogador(servidor)
+    servidor.relogio.valor = 1234.0
+
+    servidor.rodar(servidor.server.encerramento_solicitado("m1"))
+
+    assert servidor.server.estado["fase"] == "encerrada"
+    assert servidor.server.estado["encerrada_em"] == 1234.0
+    assert len(servidor.emitidos) == 1
+    evento, dados, to = servidor.emitidos[0]
+    assert evento == "cervejaria.encerrada"
+    assert to is None
+    assert dados["causa"] == "pedido de Kauan"
+
+
+def test_jogador_que_tenta_encerrar_recebe_recusa_so_para_ele(servidor):
+    temporada_aberta_com_mestre_e_jogador(servidor)
+
+    servidor.rodar(servidor.server.encerramento_solicitado("s1"))
+
+    dados = unica_recusa(servidor, "s1")
+    assert dados["pedido"] == "cervejaria.encerramento_solicitado"
+    assert dados["motivo"] == "Apenas o Mestre pode encerrar a temporada."
+    assert servidor.server.estado["fase"] == "aberta"
+
+
+def test_depois_de_encerrar_o_tempo_congela(servidor):
+    temporada_aberta_com_mestre_e_jogador(servidor)
+    com_obra(servidor)
+    servidor.rodar(servidor.server.encerramento_solicitado("m1"))
+    servidor.emitidos.clear()
+
+    servidor.rodar(servidor.server.produzir_cevada())
+    servidor.rodar(servidor.server.concluir_obra(1))
+
+    assert servidor.emitidos == []
+    assert servidor.server.estado["toras"] == 150
+    assert 1 in servidor.server.estado["obras"]
+
+
+def test_depois_de_encerrar_construir_e_reabrir_sao_recusados(servidor):
+    temporada_aberta_com_mestre_e_jogador(servidor)
+    servidor.rodar(servidor.server.encerramento_solicitado("m1"))
+
+    servidor.emitidos.clear()
+    servidor.rodar(servidor.server.construcao_solicitada("s1", {"tipo": "maltaria"}))
+    assert unica_recusa(servidor, "s1")["motivo"] == "A temporada está encerrada."
+
+    servidor.emitidos.clear()
+    servidor.rodar(servidor.server.abertura_solicitada("m1"))
+    assert unica_recusa(servidor, "m1")["motivo"] == (
+        "A temporada já foi encerrada. Reinicie o servidor para começar outra.")
+
+
+# ----- Etapa 6: disputa (só um pedido vence) -----
+
+def disputar_construcao(servidor, monkeypatch):
+    """Dois Jogadores pedem ao mesmo tempo. O emit falso cede a vez (sleep(0)), para
+    que qualquer await no meio do handler deixasse o outro pedido se intercalar."""
+    emitidos = servidor.emitidos
+
+    async def emit_que_cede(evento, dados=None, to=None, **_):
+        await asyncio.sleep(0)
+        emitidos.append((evento, dados, to))
+
+    monkeypatch.setattr(servidor.server.sio, "emit", emit_que_cede)
+    construir = servidor.server.construcao_solicitada
+
+    async def os_dois_juntos():
+        await asyncio.gather(construir("a", {"tipo": "maltaria"}),
+                             construir("b", {"tipo": "tanque"}))
+
+    servidor.rodar(os_dois_juntos())
+    iniciadas = [e for e in emitidos if e[0] == "construcao.iniciada"]
+    recusas = [e for e in emitidos if e[0] == "operacao.recusada"]
+    return iniciadas, recusas
+
+
+def preparar_disputa(servidor, obras, toras):
+    conectar(servidor, "a", "Ana", "jogador")
+    conectar(servidor, "b", "Bia", "jogador")
+    servidor.server.estado["fase"] = "aberta"
+    servidor.server.estado["toras"] = toras
+    for i in range(obras):
+        com_obra(servidor, obra_id=100 + i)
+    servidor.emitidos.clear()
+
+
+def test_disputa_pelo_ultimo_cervejeiro(servidor, monkeypatch):
+    preparar_disputa(servidor, obras=1, toras=100)
+
+    iniciadas, recusas = disputar_construcao(servidor, monkeypatch)
+
+    assert len(iniciadas) == 1
+    assert len(recusas) == 1
+    sid_do_vencedor = {"Ana": "a", "Bia": "b"}[iniciadas[0][1]["obra"]["pedida_por"]]
+    sid_recusado = recusas[0][2]
+    assert {sid_do_vencedor, sid_recusado} == {"a", "b"}
+    assert recusas[0][1]["motivo"] == "Nenhum cervejeiro livre. Aguarde uma obra terminar."
+    assert len(servidor.server.estado["obras"]) == 2
+
+
+def test_disputa_pela_ultima_cevada(servidor, monkeypatch):
+    preparar_disputa(servidor, obras=0, toras=50)
+
+    iniciadas, recusas = disputar_construcao(servidor, monkeypatch)
+
+    assert len(iniciadas) == 1
+    assert len(recusas) == 1
+    assert recusas[0][1]["motivo"] == "Cevada insuficiente: faltam 50. Aguarde a próxima colheita."
+    assert servidor.server.estado["toras"] == 0

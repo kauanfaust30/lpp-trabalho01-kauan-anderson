@@ -35,6 +35,8 @@ Eventos e motivos esperados: [contracts/eventos.md](contracts/eventos.md).
 | 11 | A encerra com obra/lote em andamento | `cervejaria.encerrada`; nenhum fato de temporizador depois; obra e lote congelados na tela | US5 |
 | 12 | B tenta construir ou engarrafar | Só B recebe "A temporada está encerrada." | FR-011 |
 | 13 | Conferir o Painel e o rodapé | Contador por evento; nomes Kauan Faust e Anderson Moreira | FR-013–015 |
+| 14 | Com a temporada encerrada e uma obra congelada, A clica em Abrir temporada | `cervejaria.iniciada` nas duas abas; mapa redesenhado sem casas nem canteiros; cevada 150, produção 10, cerveja 0, cervejeiros 0/2; nos 10 s seguintes nenhum `construcao.concluida`/`lote.pronto` da obra antiga, só `recurso.produzido` da nova temporada | FR-019 / Cenário 6 |
+| 15 | B tenta abrir a temporada (aberta) | Só B recebe "Apenas o Mestre pode abrir a temporada."; A clicando de novo recebe "A temporada já está aberta." | FR-001 |
 
 ## Critério de pronto
 

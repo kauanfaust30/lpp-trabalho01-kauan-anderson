@@ -50,7 +50,7 @@ Todo pedido gera **exatamente um** fato: o fato de aceite (todos) ou `operacao.r
 | Evento | Para | Dados além de `estado` e `causa` | Origem |
 |--------|------|----------------------------------|--------|
 | `estado.sincronizado` | só o recém-conectado | `papel` | conexão |
-| `cervejaria.iniciada` | todos | — | pedido |
+| `cervejaria.iniciada` | todos | `reaberta` (bool: `true` quando a temporada anterior estava encerrada e o estado foi reiniciado) | pedido |
 | `cervejaria.encerrada` | todos | — | pedido |
 | `construcao.iniciada` | todos | `obra: {id, tipo, pedida_por}` | pedido |
 | `construcao.concluida` | todos | `obra: {id, tipo}` | temporizador (8 s) |
@@ -63,6 +63,12 @@ Todo pedido gera **exatamente um** fato: o fato de aceite (todos) ou `operacao.r
 Após `cervejaria.encerrada`, nenhum `recurso.produzido`, `construcao.concluida`, `lote.pronto`
 ou `lote.perdido` é emitido.
 
+**Reabertura (FR-019)**: com a temporada encerrada, o Mestre reabre com o mesmo pedido
+`cervejaria.abertura_solicitada`. O servidor reinicia o estado (mantendo participantes e Mestre)
+e emite `cervejaria.iniciada` para todos com `reaberta: true` e o `estado` já zerado (cevada 150,
+produção 10, cerveja 0, sem obras nem lotes). Nenhum evento novo é criado. Temporizadores da
+temporada anterior não emitem nenhum fato depois da reabertura.
+
 ## Motivos de recusa (texto exato)
 
 | Situação | `motivo` |
@@ -72,7 +78,6 @@ ou `lote.perdido` é emitido.
 | Jogador abre | "Apenas o Mestre pode abrir a temporada." |
 | Jogador encerra | "Apenas o Mestre pode encerrar a temporada." |
 | Abrir já aberta | "A temporada já está aberta." |
-| Abrir encerrada | "A temporada já foi encerrada. Reinicie o servidor para começar outra." |
 | Encerrar não aberta | "A temporada ainda não foi aberta." |
 | Encerrar já encerrada | "A temporada já está encerrada." |
 | Mestre constrói | "Apenas Jogadores podem construir." |
@@ -92,7 +97,7 @@ pela parte Vue (`v-for` sobre `estado.lotes`).
 | Fato | Reação no cliente |
 |------|-------------------|
 | `estado.sincronizado` | `atualizar(d)`; `jogo.mostrarEstado(d.estado)` |
-| `cervejaria.iniciada` | `atualizar(d)`; `jogo.vilaIniciada()` |
+| `cervejaria.iniciada` | `atualizar(d)`; se `d.reaberta`: recria a cena (limpa `#jogo`, `jogo = criarJogo()`, `jogo.iniciar("jogo")`, `jogo.mostrarEstado(d.estado)`) e avisa "Nova temporada aberta"; senão `jogo.vilaIniciada()`. A função `criarJogo` e a cena Phaser não são alteradas |
 | `construcao.iniciada` | `atualizar(d)`; `jogo.obraIniciada(d.estado)` |
 | `construcao.concluida` | `atualizar(d)`; `jogo.obraConcluida(d.estado)` |
 | `recurso.produzido` | `atualizar(d)`; `jogo.recursoProduzido(d.estado)` |

@@ -60,6 +60,19 @@ def motivo_recusa_abertura(estado, participante):
     return None
 
 
+def motivo_recusa_encerramento(estado, participante):
+    """Por que o pedido de encerrar a temporada deve ser recusado, ou None se pode encerrar."""
+    if participante is None:
+        return MOTIVO_NAO_REGISTRADO
+    if participante["papel"] != "mestre":
+        return "Apenas o Mestre pode encerrar a temporada."
+    if estado["fase"] == "aguardando":
+        return "A temporada ainda não foi aberta."
+    if estado["fase"] == "encerrada":
+        return "A temporada já está encerrada."
+    return None
+
+
 def motivo_recusa_fase(estado):
     """Motivo comum a construir e engarrafar: só vale com a temporada aberta."""
     if estado["fase"] == "aguardando":
