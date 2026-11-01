@@ -87,8 +87,8 @@ retrato público e auxiliares usados por todas as histórias.
 - [X] T012 Em `server.py`, criar os auxiliares `def causa_pedido(sid)` (devolve `"pedido de <nome>"` quando `sid` está em `estado["participantes"]` e `"conexão"` quando não está — usar `.get`, **sem `KeyError`**), `def fato(causa, **extras)` (devolve `{"estado": regras.retrato(estado, agora()), "causa": causa, **extras}`) e `async def recusar(sid, pedido, motivo)` que emite `operacao.recusada` com `fato(causa_pedido(sid), pedido=pedido, motivo=motivo)` e `to=sid` — com comentário `# Por quê: a recusa é um fato só de quem pediu (R4)`
 - [X] T013 Em `server.py`, implementar `@sio.event async def connect(sid, environ, auth)` (registra o participante com nome padrão `"Anônimo"`, define `mestre_sid` se papel `mestre`, e só então emite `estado.sincronizado` com `to=sid`) e `@sio.event async def disconnect(sid)`, com comentários de porquê; fazer T010 passar
 - [X] T014 Em `client/index.html`, **só na parte Vue** (função `entrar()` dentro de `createApp`): mover `conectado.value = true` e `nextTick(() => jogo.iniciar("jogo"))` do `socket.on("connect")` para a reação de `estado.sincronizado` (assim só entra na tela da cervejaria quem o servidor aceitou) e acrescentar `ouvir("estado.sincronizado", "copia o estado e desenha a cervejaria", (d) => { atualizar(d); conectado.value = true; nextTick(() => { jogo.iniciar("jogo"); jogo.mostrarEstado(d.estado); }); })` com comentário de porquê. **Não alterar a função `criarJogo` nem a cena Phaser** (`VilaScene`); conferir com `git diff client/index.html` que nenhuma linha entre `function criarJogo()` e o fim desse `<script>` mudou
-- [ ] T015 Validar a etapa 1 **antes do commit**: (a) `pytest` verde; (b) com `uvicorn server:app --reload`, abrir duas abas: na aba A entrar como **Jogador** e na aba B como **Mestre**; nas duas, a tela de entrada some e aparece a tela da cervejaria com o mapa Phaser desenhado; (c) o Painel de eventos de cada aba mostra `⬇ on estado.sincronizado` com causa "conexão" e os dados do estado; (d) a aba A não recebe o `estado.sincronizado` da aba B. Se a tela de entrada não sair, corrigir T014 antes de seguir
-- [ ] T016 Commit `feat(etapa 1): conectar e sincronizar o estado` (só depois de T015 aprovada)
+- [X] T015 Validar a etapa 1 **antes do commit**: (a) `pytest` verde; (b) com `uvicorn server:app --reload`, abrir duas abas: na aba A entrar como **Jogador** e na aba B como **Mestre**; nas duas, a tela de entrada some e aparece a tela da cervejaria com o mapa Phaser desenhado; (c) o Painel de eventos de cada aba mostra `⬇ on estado.sincronizado` com causa "conexão" e os dados do estado; (d) a aba A não recebe o `estado.sincronizado` da aba B. Se a tela de entrada não sair, corrigir T014 antes de seguir
+- [X] T016 Commit `feat(etapa 1): conectar e sincronizar o estado` (só depois de T015 aprovada)
 
 **Checkpoint**: base pronta; histórias podem começar.
 
@@ -103,16 +103,16 @@ abas mostram "Temporada aberta" em < 1 s.
 
 ### Testes (escrever primeiro, devem falhar)
 
-- [ ] T017 [P] [US1] Em `tests/test_regras.py`, testar `motivo_recusa_abertura(estado, participante)`: `None` para Mestre com fase `"aguardando"`; `"Você não está na cervejaria. Entre novamente."` para `participante is None`; `"Apenas o Mestre pode abrir a temporada."` para Jogador; `"A temporada já está aberta."` com fase `"aberta"`; `"A temporada já foi encerrada. Reinicie o servidor para começar outra."` com fase `"encerrada"`
-- [ ] T018 [P] [US1] Em `tests/test_servidor.py`, testar o handler `server.abertura_solicitada(sid)` (evento `cervejaria.abertura_solicitada`): pelo Mestre → `estado["fase"] == "aberta"` e um único emit `cervejaria.iniciada` para todos (`to is None`) com `causa == "pedido de <nome>"`; por Jogador → um único emit `operacao.recusada` com `to=sid`, `pedido == "cervejaria.abertura_solicitada"`, motivo exato, e `fase` continua `"aguardando"`
+- [X] T017 [P] [US1] Em `tests/test_regras.py`, testar `motivo_recusa_abertura(estado, participante)`: `None` para Mestre com fase `"aguardando"`; `"Você não está na cervejaria. Entre novamente."` para `participante is None`; `"Apenas o Mestre pode abrir a temporada."` para Jogador; `"A temporada já está aberta."` com fase `"aberta"`; `"A temporada já foi encerrada. Reinicie o servidor para começar outra."` com fase `"encerrada"`
+- [X] T018 [P] [US1] Em `tests/test_servidor.py`, testar o handler `server.abertura_solicitada(sid)` (evento `cervejaria.abertura_solicitada`): pelo Mestre → `estado["fase"] == "aberta"` e um único emit `cervejaria.iniciada` para todos (`to is None`) com `causa == "pedido de <nome>"`; por Jogador → um único emit `operacao.recusada` com `to=sid`, `pedido == "cervejaria.abertura_solicitada"`, motivo exato, e `fase` continua `"aguardando"`
 
 ### Implementação
 
-- [ ] T019 [US1] Implementar `motivo_recusa_abertura` em `regras.py` (constante `MOTIVO_NAO_REGISTRADO = "Você não está na cervejaria. Entre novamente."`, reutilizada pelas próximas regras) até T017 passar
-- [ ] T020 [US1] Em `server.py`, implementar `@sio.on("cervejaria.abertura_solicitada") async def abertura_solicitada(sid)` na sequência validar → recusar → `estado["fase"] = "aberta"` → `await sio.emit("cervejaria.iniciada", fato(causa_pedido(sid)))`, com comentários de porquê; fazer T018 passar
-- [ ] T021 [US1] Em `client/index.html`, implementar `abrirVila()` com `pedir("cervejaria.abertura_solicitada")` e, em `entrar()`, `ouvir("cervejaria.iniciada", "mostra a temporada aberta", (d) => { atualizar(d); jogo.vilaIniciada(); })`, ambos com comentário de porquê
-- [ ] T022 [US1] Validar o Independent Test com duas abas; `pytest` verde
-- [ ] T023 [US1] Commit `feat(etapa 2): Mestre abre a temporada`
+- [X] T019 [US1] Implementar `motivo_recusa_abertura` em `regras.py` (constante `MOTIVO_NAO_REGISTRADO = "Você não está na cervejaria. Entre novamente."`, reutilizada pelas próximas regras) até T017 passar
+- [X] T020 [US1] Em `server.py`, implementar `@sio.on("cervejaria.abertura_solicitada") async def abertura_solicitada(sid)` na sequência validar → recusar → `estado["fase"] = "aberta"` → `await sio.emit("cervejaria.iniciada", fato(causa_pedido(sid)))`, com comentários de porquê; fazer T018 passar
+- [X] T021 [US1] Em `client/index.html`, implementar `abrirVila()` com `pedir("cervejaria.abertura_solicitada")` e, em `entrar()`, `ouvir("cervejaria.iniciada", "mostra a temporada aberta", (d) => { atualizar(d); jogo.vilaIniciada(); })`, ambos com comentário de porquê
+- [X] T022 [US1] Validar o Independent Test com duas abas; `pytest` verde
+- [X] T023 [US1] Commit `feat(etapa 2): Mestre abre a temporada`
 
 **Checkpoint**: MVP — conectar, sincronizar e abrir funcionam em tempo real.
 

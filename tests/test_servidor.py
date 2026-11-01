@@ -69,3 +69,35 @@ def test_disconnect_de_sid_desconhecido_nao_falha(servidor):
     servidor.rodar(servidor.server.disconnect("ninguem"))
 
     assert servidor.server.estado["participantes"] == {}
+
+
+# ----- Etapa 2: Mestre abre a temporada -----
+
+def test_mestre_abre_e_todos_recebem_cervejaria_iniciada(servidor):
+    conectar(servidor, "m1", "Kauan", "mestre")
+    servidor.emitidos.clear()
+
+    servidor.rodar(servidor.server.abertura_solicitada("m1"))
+
+    assert servidor.server.estado["fase"] == "aberta"
+    assert len(servidor.emitidos) == 1
+    evento, dados, to = servidor.emitidos[0]
+    assert evento == "cervejaria.iniciada"
+    assert to is None
+    assert dados["causa"] == "pedido de Kauan"
+    assert dados["estado"]["fase"] == "aberta"
+
+
+def test_jogador_que_tenta_abrir_recebe_recusa_so_para_ele(servidor):
+    conectar(servidor, "s1", "Ana", "jogador")
+    servidor.emitidos.clear()
+
+    servidor.rodar(servidor.server.abertura_solicitada("s1"))
+
+    assert servidor.server.estado["fase"] == "aguardando"
+    assert len(servidor.emitidos) == 1
+    evento, dados, to = servidor.emitidos[0]
+    assert evento == "operacao.recusada"
+    assert to == "s1"
+    assert dados["pedido"] == "cervejaria.abertura_solicitada"
+    assert dados["motivo"] == "Apenas o Mestre pode abrir a temporada."

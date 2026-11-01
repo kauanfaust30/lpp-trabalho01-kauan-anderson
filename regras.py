@@ -26,6 +26,9 @@ PRAZO_LOTE = 20            # segundos para engarrafar
 CERVEJA_POR_LOTE = 1
 TIPOS_CONSTRUCAO = ("maltaria", "tanque", "adega")
 
+# Motivo reaproveitado por todas as regras: pedido de uma aba que o servidor não registrou.
+MOTIVO_NAO_REGISTRADO = "Você não está na cervejaria. Entre novamente."
+
 
 def estado_inicial():
     """Devolve um estado novo da cervejaria, antes de o Mestre abrir a temporada."""
@@ -42,6 +45,19 @@ def estado_inicial():
         "encerrada_em": None,  # instante do encerramento (congela os tempos)
         "proximo_id": 1,
     }
+
+
+def motivo_recusa_abertura(estado, participante):
+    """Por que o pedido de abrir a temporada deve ser recusado, ou None se pode abrir."""
+    if participante is None:
+        return MOTIVO_NAO_REGISTRADO
+    if participante["papel"] != "mestre":
+        return "Apenas o Mestre pode abrir a temporada."
+    if estado["fase"] == "aberta":
+        return "A temporada já está aberta."
+    if estado["fase"] == "encerrada":
+        return "A temporada já foi encerrada. Reinicie o servidor para começar outra."
+    return None
 
 
 def segundos_restantes(instante_final, estado, agora):

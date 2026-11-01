@@ -317,7 +317,13 @@
           });
         });
 
-        // ETAPA 2: ouvir "vila.iniciada"         -> jogo.vilaIniciada()
+        // Por quê: a abertura é decidida pelo servidor; todas as abas só mudam a
+        // fase quando ouvem o FATO confirmado, não quando o Mestre clica.
+        ouvir("cervejaria.iniciada", "mostra a temporada aberta", (d) => {
+          atualizar(d);
+          jogo.vilaIniciada();
+        });
+
         // ETAPA 3: ouvir "construcao.iniciada"   -> jogo.obraIniciada(...)
         // ETAPA 4: ouvir "operacao.recusada"     -> jogo.recusado(...)
         // ETAPA 5: ouvir "recurso.produzido"     -> jogo.recursoProduzido(...)
@@ -328,7 +334,9 @@
       // ===== PEDIDOS (emit): o cliente PEDE algo ao servidor =====
       // pedir(evento)
       function abrirVila() {
-        // ETAPA 2: pedir "vila.abertura_solicitada"
+        // Por quê: o cliente não abre a temporada sozinho; ele só PEDE ao servidor,
+        // que decide e avisa todos com "cervejaria.iniciada" (ou recusa só para ele).
+        pedir("cervejaria.abertura_solicitada");
       }
       function construir() {
         // ETAPA 3: pedir "construcao.solicitada"

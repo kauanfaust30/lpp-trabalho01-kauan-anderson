@@ -65,3 +65,21 @@ async def disconnect(sid, *_):
     estado["participantes"].pop(sid, None)
     if estado["mestre_sid"] == sid:
         estado["mestre_sid"] = None
+
+
+# ----- Etapa 2: Mestre abre a temporada -----
+
+@sio.on("cervejaria.abertura_solicitada")
+async def abertura_solicitada(sid):
+    # Por quê: abrir é um PEDIDO do cliente; quem decide se pode é o servidor (R1).
+    # 1. validar (sem await até o estado mudar, para nenhum outro pedido se intercalar)
+    motivo = regras.motivo_recusa_abertura(estado, estado["participantes"].get(sid))
+    # 2. recusar só para quem pediu
+    if motivo:
+        await recusar(sid, "cervejaria.abertura_solicitada", motivo)
+        return
+    # 3. alterar o estado
+    estado["fase"] = "aberta"
+    # 4. emitir o fato
+    # Por quê: a temporada aberta muda a tela de TODOS, então vai para todas as abas.
+    await sio.emit("cervejaria.iniciada", fato(causa_pedido(sid)))

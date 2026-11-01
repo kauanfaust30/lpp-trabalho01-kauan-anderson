@@ -107,3 +107,43 @@ def test_restante_congela_no_encerramento():
 
     assert retrato["obras"][0]["restante"] == 3
     assert retrato["lotes"][0]["restante"] == 15
+
+
+# ----- Etapa 2: abrir a temporada -----
+
+MESTRE = {"nome": "Kauan", "papel": "mestre"}
+JOGADOR = {"nome": "Ana", "papel": "jogador"}
+
+
+def estado_na_fase(fase):
+    estado = regras.estado_inicial()
+    estado["fase"] = fase
+    return estado
+
+
+def test_mestre_pode_abrir_temporada_aguardando():
+    assert regras.motivo_recusa_abertura(estado_na_fase("aguardando"), MESTRE) is None
+
+
+def test_abertura_por_quem_nao_esta_na_cervejaria():
+    motivo = regras.motivo_recusa_abertura(estado_na_fase("aguardando"), None)
+
+    assert motivo == "Você não está na cervejaria. Entre novamente."
+
+
+def test_jogador_nao_pode_abrir():
+    motivo = regras.motivo_recusa_abertura(estado_na_fase("aguardando"), JOGADOR)
+
+    assert motivo == "Apenas o Mestre pode abrir a temporada."
+
+
+def test_nao_abre_temporada_ja_aberta():
+    motivo = regras.motivo_recusa_abertura(estado_na_fase("aberta"), MESTRE)
+
+    assert motivo == "A temporada já está aberta."
+
+
+def test_nao_reabre_temporada_encerrada():
+    motivo = regras.motivo_recusa_abertura(estado_na_fase("encerrada"), MESTRE)
+
+    assert motivo == "A temporada já foi encerrada. Reinicie o servidor para começar outra."
