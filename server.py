@@ -83,3 +83,30 @@ async def abertura_solicitada(sid):
     # 4. emitir o fato
     # Por quê: a temporada aberta muda a tela de TODOS, então vai para todas as abas.
     await sio.emit("cervejaria.iniciada", fato(causa_pedido(sid)))
+
+
+# ----- Etapa 3: pedido e fato de construir -----
+
+@sio.on("construcao.solicitada")
+async def construcao_solicitada(sid, dados=None):
+    # Por quê: construir é um PEDIDO do Jogador; só o servidor sabe se há cevada e
+    # cervejeiro livre, então é ele quem decide (R3).
+    tipo = (dados or {}).get("tipo")    # pedido sem dados não quebra: vira recusa
+    participante = estado["participantes"].get(sid)
+    # 1. validar (sem await até o estado mudar: em disputa, só um pedido vence)
+    motivo = regras.motivo_recusa_construcao(estado, participante, tipo)
+    # 2. recusar só para quem pediu
+    if motivo:
+        await recusar(sid, "construcao.solicitada", motivo)
+        return
+    # 3. alterar o estado: gasta a cevada e ocupa um cervejeiro com a obra
+    obra_id = estado["proximo_id"]
+    estado["proximo_id"] += 1
+    estado["toras"] -= regras.CUSTO_CONSTRUCAO
+    estado["obras"][obra_id] = {"id": obra_id, "tipo": tipo, "pedida_por": participante["nome"],
+                                "termina_em": agora() + regras.TEMPO_OBRA}
+    # 4. emitir o fato
+    # Por quê: a cevada e os cervejeiros são de todos (cooperativo), então todas as
+    # abas precisam ver a obra começar.
+    obra = {"id": obra_id, "tipo": tipo, "pedida_por": participante["nome"]}
+    await sio.emit("construcao.iniciada", fato(causa_pedido(sid), obra=obra))

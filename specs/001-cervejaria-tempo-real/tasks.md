@@ -63,7 +63,7 @@ de entrada do kit.
 - [X] T005 Criar `tests/conftest.py` com a fixture `servidor` que: recria `server.estado` com `regras.estado_inicial()`; substitui `server.sio.emit` por uma corrotina que grava `(evento, dados, to)` numa lista `emitidos`; substitui `server.sio.sleep` por corrotina instantânea; substitui `server.sio.start_background_task` por função que só grava `(funcao, args)` em `tarefas`; substitui `server.agora` por um relógio controlável (começa em `1000.0`); devolve um objeto com `server`, `emitidos`, `tarefas`, `relogio` e `rodar(coro)` (= `asyncio.run`)
 - [X] T006 [P] Trocar o rodapé de `client/index.html` para `<footer>Desenvolvido por: Kauan Faust e Anderson Moreira</footer>`
 - [X] T007 Validar: `pytest` verde; `uvicorn server:app --reload` sobe e `http://127.0.0.1:8000` mostra a tela de entrada com o rodapé
-- [ ] T008 Commit `feat(etapa 0): servidor, estado inicial, base de testes e rodapé`
+- [X] T008 Commit `feat(etapa 0): servidor, estado inicial, base de testes e rodapé`
 
 **Checkpoint**: servidor sobe, testes rodam, estado inicial com os números da spec.
 
@@ -128,16 +128,16 @@ cervejeiro ficar ocupado.
 
 ### Testes (escrever primeiro, devem falhar)
 
-- [ ] T024 [P] [US2] Em `tests/test_regras.py`, testar que `motivo_recusa_construcao(estado, participante, tipo)` devolve `None` para Jogador, fase `"aberta"`, tipo `"maltaria"`/`"tanque"`/`"adega"`, `toras >= 50` (inclusive exatamente 50) e `len(obras) < 2`
-- [ ] T025 [P] [US2] Em `tests/test_servidor.py`, testar o handler `server.construcao_solicitada(sid, dados)` (evento `construcao.solicitada`) com `{"tipo": "maltaria"}` (temporada aberta, Jogador): `toras` 150 → 100; nova obra em `estado["obras"]` com `id` vindo de `proximo_id`, `tipo`, `pedida_por` (nome) e `termina_em == relogio + 8`; `proximo_id` incrementado; um único emit `construcao.iniciada` para todos com `obra == {id, tipo, pedida_por}` e `estado.trabalhadores == 1`
+- [X] T024 [P] [US2] Em `tests/test_regras.py`, testar que `motivo_recusa_construcao(estado, participante, tipo)` devolve `None` para Jogador, fase `"aberta"`, tipo `"maltaria"`/`"tanque"`/`"adega"`, `toras >= 50` (inclusive exatamente 50) e `len(obras) < 2`
+- [X] T025 [P] [US2] Em `tests/test_servidor.py`, testar o handler `server.construcao_solicitada(sid, dados)` (evento `construcao.solicitada`) com `{"tipo": "maltaria"}` (temporada aberta, Jogador): `toras` 150 → 100; nova obra em `estado["obras"]` com `id` vindo de `proximo_id`, `tipo`, `pedida_por` (nome) e `termina_em == relogio + 8`; `proximo_id` incrementado; um único emit `construcao.iniciada` para todos com `obra == {id, tipo, pedida_por}` e `estado.trabalhadores == 1`
 
 ### Implementação
 
-- [ ] T026 [US2] Criar `motivo_recusa_construcao` em `regras.py` devolvendo `None` (as checagens de recusa entram na etapa 4) até T024 passar
-- [ ] T027 [US2] Em `server.py`, implementar `@sio.on("construcao.solicitada") async def construcao_solicitada(sid, dados=None)`, lendo o tipo com `tipo = (dados or {}).get("tipo")` (pedido sem dados ou sem a chave vira a recusa de tipo desconhecido, sem quebrar), na sequência validar → recusar → `estado["toras"] -= regras.CUSTO_CONSTRUCAO`, criar a obra e incrementar `proximo_id` → `await sio.emit("construcao.iniciada", fato(..., obra={...}))`, com comentários de porquê; fazer T025 passar
-- [ ] T028 [US2] Em `client/index.html`, implementar `construir()` com `pedir("construcao.solicitada", { tipo: "maltaria" })` (a escolha do tipo entra na etapa 8) e `ouvir("construcao.iniciada", "desenha o canteiro e desconta a cevada", (d) => { atualizar(d); jogo.obraIniciada(d.estado); })`, com comentários de porquê
-- [ ] T029 [US2] Validar o Independent Test com duas abas; `pytest` verde
-- [ ] T030 [US2] Commit `feat(etapa 3): pedido e fato de construir`
+- [X] T026 [US2] Criar `motivo_recusa_construcao` em `regras.py` devolvendo `None` (as checagens de recusa entram na etapa 4) até T024 passar
+- [X] T027 [US2] Em `server.py`, implementar `@sio.on("construcao.solicitada") async def construcao_solicitada(sid, dados=None)`, lendo o tipo com `tipo = (dados or {}).get("tipo")` (pedido sem dados ou sem a chave vira a recusa de tipo desconhecido, sem quebrar), na sequência validar → recusar → `estado["toras"] -= regras.CUSTO_CONSTRUCAO`, criar a obra e incrementar `proximo_id` → `await sio.emit("construcao.iniciada", fato(..., obra={...}))`, com comentários de porquê; fazer T025 passar
+- [X] T028 [US2] Em `client/index.html`, implementar `construir()` com `pedir("construcao.solicitada", { tipo: "maltaria" })` (a escolha do tipo entra na etapa 8) e `ouvir("construcao.iniciada", "desenha o canteiro e desconta a cevada", (d) => { atualizar(d); jogo.obraIniciada(d.estado); })`, com comentários de porquê
+- [X] T029 [US2] Validar o Independent Test com duas abas; `pytest` verde
+- [X] T030 [US2] Commit `feat(etapa 3): pedido e fato de construir`
 
 ---
 

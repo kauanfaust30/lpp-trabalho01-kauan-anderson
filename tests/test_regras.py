@@ -147,3 +147,26 @@ def test_nao_reabre_temporada_encerrada():
     motivo = regras.motivo_recusa_abertura(estado_na_fase("encerrada"), MESTRE)
 
     assert motivo == "A temporada já foi encerrada. Reinicie o servidor para começar outra."
+
+
+# ----- Etapa 3: construir (casos aceitos) -----
+
+def test_jogador_pode_construir_cada_tipo_com_temporada_aberta():
+    estado = estado_na_fase("aberta")
+
+    for tipo in ("maltaria", "tanque", "adega"):
+        assert regras.motivo_recusa_construcao(estado, JOGADOR, tipo) is None
+
+
+def test_pode_construir_com_cevada_exatamente_igual_ao_custo():
+    estado = estado_na_fase("aberta")
+    estado["toras"] = 50
+
+    assert regras.motivo_recusa_construcao(estado, JOGADOR, "maltaria") is None
+
+
+def test_pode_construir_com_um_cervejeiro_ainda_livre():
+    estado = estado_na_fase("aberta")
+    estado["obras"][1] = {"id": 1, "tipo": "adega", "pedida_por": "Ana", "termina_em": 108.0}
+
+    assert regras.motivo_recusa_construcao(estado, JOGADOR, "tanque") is None

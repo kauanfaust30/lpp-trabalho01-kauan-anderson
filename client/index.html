@@ -324,7 +324,13 @@
           jogo.vilaIniciada();
         });
 
-        // ETAPA 3: ouvir "construcao.iniciada"   -> jogo.obraIniciada(...)
+        // Por quê: a obra só começa quando o servidor confirma; todas as abas
+        // desenham o canteiro e veem a cevada e os cervejeiros que ele mandou.
+        ouvir("construcao.iniciada", "desenha o canteiro e desconta a cevada", (d) => {
+          atualizar(d);
+          jogo.obraIniciada(d.estado);
+        });
+
         // ETAPA 4: ouvir "operacao.recusada"     -> jogo.recusado(...)
         // ETAPA 5: ouvir "recurso.produzido"     -> jogo.recursoProduzido(...)
         //          e "construcao.concluida"      -> jogo.obraConcluida(...)
@@ -339,7 +345,9 @@
         pedir("cervejaria.abertura_solicitada");
       }
       function construir() {
-        // ETAPA 3: pedir "construcao.solicitada"
+        // Por quê: o cliente não gasta cevada nem ocupa cervejeiro por conta própria;
+        // ele só PEDE, e o servidor decide (a escolha do tipo entra na etapa 8).
+        pedir("construcao.solicitada", { tipo: "maltaria" });
       }
       function encerrarVila() {
         // ETAPA 6: pedir "vila.encerramento_solicitado"

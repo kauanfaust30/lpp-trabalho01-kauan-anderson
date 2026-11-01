@@ -60,6 +60,14 @@ def motivo_recusa_abertura(estado, participante):
     return None
 
 
+def motivo_recusa_construcao(estado, participante, tipo):
+    """Por que o pedido de construir deve ser recusado, ou None se pode construir.
+
+    Etapa 3: só o caminho de aceite. As checagens de recusa entram na Etapa 4.
+    """
+    return None
+
+
 def segundos_restantes(instante_final, estado, agora):
     """Segundos (arredondados para cima, nunca negativos) até `instante_final`.
 

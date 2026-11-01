@@ -101,3 +101,39 @@ def test_jogador_que_tenta_abrir_recebe_recusa_so_para_ele(servidor):
     assert to == "s1"
     assert dados["pedido"] == "cervejaria.abertura_solicitada"
     assert dados["motivo"] == "Apenas o Mestre pode abrir a temporada."
+
+
+# ----- Etapa 3: pedido e fato de construir -----
+
+def temporada_aberta_com_jogador(servidor, sid="s1", nome="Ana"):
+    conectar(servidor, sid, nome, "jogador")
+    servidor.server.estado["fase"] = "aberta"
+    servidor.emitidos.clear()
+
+
+def test_construcao_aceita_desconta_cevada_e_cria_obra(servidor):
+    temporada_aberta_com_jogador(servidor)
+
+    servidor.rodar(servidor.server.construcao_solicitada("s1", {"tipo": "maltaria"}))
+
+    estado = servidor.server.estado
+    assert estado["toras"] == 100
+    assert estado["obras"] == {
+        1: {"id": 1, "tipo": "maltaria", "pedida_por": "Ana", "termina_em": 1008.0},
+    }
+    assert estado["proximo_id"] == 2
+
+
+def test_construcao_aceita_avisa_todos_com_construcao_iniciada(servidor):
+    temporada_aberta_com_jogador(servidor)
+
+    servidor.rodar(servidor.server.construcao_solicitada("s1", {"tipo": "maltaria"}))
+
+    assert len(servidor.emitidos) == 1
+    evento, dados, to = servidor.emitidos[0]
+    assert evento == "construcao.iniciada"
+    assert to is None
+    assert dados["causa"] == "pedido de Ana"
+    assert dados["obra"] == {"id": 1, "tipo": "maltaria", "pedida_por": "Ana"}
+    assert dados["estado"]["trabalhadores"] == 1
+    assert dados["estado"]["toras"] == 100
