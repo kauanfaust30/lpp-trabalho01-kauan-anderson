@@ -137,3 +137,87 @@ def test_construcao_aceita_avisa_todos_com_construcao_iniciada(servidor):
     assert dados["obra"] == {"id": 1, "tipo": "maltaria", "pedida_por": "Ana"}
     assert dados["estado"]["trabalhadores"] == 1
     assert dados["estado"]["toras"] == 100
+
+
+# ----- Etapa 4: recusa só para quem pediu -----
+
+def unica_recusa(servidor, sid):
+    """Confere que houve exatamente um emit, uma recusa só para `sid`, e a devolve."""
+    assert len(servidor.emitidos) == 1
+    evento, dados, to = servidor.emitidos[0]
+    assert evento == "operacao.recusada"
+    assert to == sid
+    return dados
+
+
+def test_construcao_com_temporada_fechada_e_recusada_so_para_quem_pediu(servidor):
+    conectar(servidor, "s1", "Ana", "jogador")
+    servidor.emitidos.clear()
+
+    servidor.rodar(servidor.server.construcao_solicitada("s1", {"tipo": "maltaria"}))
+
+    dados = unica_recusa(servidor, "s1")
+    assert dados["pedido"] == "construcao.solicitada"
+    assert dados["motivo"] == "A temporada não está aberta."
+    assert servidor.server.estado["toras"] == 150
+    assert servidor.server.estado["obras"] == {}
+
+
+def test_construcao_de_sid_nao_registrado_e_recusada(servidor):
+    servidor.server.estado["fase"] = "aberta"
+
+    servidor.rodar(servidor.server.construcao_solicitada("fantasma", {"tipo": "maltaria"}))
+
+    dados = unica_recusa(servidor, "fantasma")
+    assert dados["motivo"] == "Você não está na cervejaria. Entre novamente."
+    assert dados["causa"] == "conexão"
+    assert servidor.server.estado["obras"] == {}
+
+
+def test_construcao_sem_dados_vira_recusa_de_tipo(servidor):
+    for dados_do_pedido in (None, {}):
+        temporada_aberta_com_jogador(servidor)
+
+        servidor.rodar(servidor.server.construcao_solicitada("s1", dados_do_pedido))
+
+        dados = unica_recusa(servidor, "s1")
+        assert dados["motivo"] == "Tipo de construção desconhecido. Escolha maltaria, tanque ou adega."
+        assert servidor.server.estado["toras"] == 150
+        assert servidor.server.estado["obras"] == {}
+
+
+def test_segundo_mestre_e_recusado_e_nao_entra(servidor):
+    conectar(servidor, "m1", "Kauan", "mestre")
+    servidor.emitidos.clear()
+
+    conectar(servidor, "m2", "Outro", "mestre")
+
+    dados = unica_recusa(servidor, "m2")
+    assert dados["pedido"] == "conexao"
+    assert dados["motivo"] == "Já existe um Mestre na cervejaria. Entre como Jogador."
+    assert "m2" not in servidor.server.estado["participantes"]
+    assert servidor.server.estado["mestre_sid"] == "m1"
+
+
+def test_mestre_recusado_que_tenta_abrir_e_recusado_de_novo(servidor):
+    conectar(servidor, "m1", "Kauan", "mestre")
+    conectar(servidor, "m2", "Outro", "mestre")
+    servidor.emitidos.clear()
+
+    servidor.rodar(servidor.server.abertura_solicitada("m2"))
+
+    dados = unica_recusa(servidor, "m2")
+    assert dados["motivo"] == "Você não está na cervejaria. Entre novamente."
+    assert dados["causa"] == "conexão"
+    assert servidor.server.estado["fase"] == "aguardando"
+
+
+def test_depois_que_o_mestre_sai_outro_mestre_entra(servidor):
+    conectar(servidor, "m1", "Kauan", "mestre")
+    servidor.rodar(servidor.server.disconnect("m1"))
+    servidor.emitidos.clear()
+
+    conectar(servidor, "m2", "Outro", "mestre")
+
+    assert servidor.server.estado["mestre_sid"] == "m2"
+    assert servidor.emitidos[0][0] == "estado.sincronizado"

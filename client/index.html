@@ -36,6 +36,7 @@
     .badge.on { background: #2e7d32; }
     .chip { display: inline-block; background: #eee; border-radius: 10px; padding: 1px 8px; margin: 0 4px 4px 0; font-size: 11px; }
     footer { margin-top: 32px; font-size: 13px; color: #666; }
+    .erro-entrada { color: #c62828; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -47,6 +48,8 @@
     <input v-model="nome" placeholder="Seu nome">
     <button @click="entrar('mestre')">Entrar como Mestre</button>
     <button @click="entrar('jogador')">Entrar como Jogador</button>
+    <!-- Recusa da entrada (ex.: já existe um Mestre), enviada pelo servidor -->
+    <p v-if="erroEntrada" class="erro-entrada">✋ {{ erroEntrada }}</p>
   </section>
 
   <!-- Tela da vila -->
@@ -247,6 +250,7 @@
       const nome = ref("");
       const papel = ref("");
       const conectado = ref(false);
+      const erroEntrada = ref("");          // motivo da recusa da entrada, se houver
       const estado = reactive({
         fase: "aguardando", toras: 0, trabalhadores: 0, limite: 0,
         producao: 0, intervalo: 0, tempo_obra: 0, custo: 0, concluidas: 0, em_obra: 0,
@@ -300,6 +304,7 @@
 
       function entrar(p) {
         papel.value = p;
+        erroEntrada.value = "";
         socket = io({ auth: { nome: nome.value || "Anônimo", papel: p } });
 
         // ===== ESCUTAS (on): o cliente reage aos FATOS do servidor =====
@@ -331,7 +336,19 @@
           jogo.obraIniciada(d.estado);
         });
 
-        // ETAPA 4: ouvir "operacao.recusada"     -> jogo.recusado(...)
+        // Por quê: quando o servidor nega um pedido, só quem pediu recebe a recusa;
+        // o cliente apenas mostra o motivo, sem decidir nada por conta própria.
+        ouvir("operacao.recusada", "mostra o motivo só para quem pediu", (d) => {
+          if (d.pedido === "conexao") {
+            // A entrada foi negada (ex.: já existe um Mestre): fica na tela de entrada.
+            erroEntrada.value = d.motivo;
+            socket.disconnect();
+            return;
+          }
+          avisar(d.motivo, "erro");
+          jogo.recusado(d.motivo);
+        });
+
         // ETAPA 5: ouvir "recurso.produzido"     -> jogo.recursoProduzido(...)
         //          e "construcao.concluida"      -> jogo.obraConcluida(...)
         // ETAPA 6: ouvir "vila.encerrada"        -> jogo.vilaEncerrada()
@@ -353,7 +370,7 @@
         // ETAPA 6: pedir "vila.encerramento_solicitado"
       }
 
-      return { nome, papel, conectado, estado, avisos, eventosVisiveis, contadores, ocultarProducao, porMinuto,
+      return { nome, papel, conectado, erroEntrada, estado, avisos, eventosVisiveis, contadores, ocultarProducao, porMinuto,
                entrar, abrirVila, construir, encerrarVila };
     }
   }).mount("#app");

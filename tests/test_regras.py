@@ -170,3 +170,82 @@ def test_pode_construir_com_um_cervejeiro_ainda_livre():
     estado["obras"][1] = {"id": 1, "tipo": "adega", "pedida_por": "Ana", "termina_em": 108.0}
 
     assert regras.motivo_recusa_construcao(estado, JOGADOR, "tanque") is None
+
+
+# ----- Etapa 4: recusas de construir (na ordem das checagens) -----
+
+def test_construcao_por_quem_nao_esta_na_cervejaria():
+    motivo = regras.motivo_recusa_construcao(estado_na_fase("aberta"), None, "maltaria")
+
+    assert motivo == "Você não está na cervejaria. Entre novamente."
+
+
+def test_mestre_nao_pode_construir():
+    motivo = regras.motivo_recusa_construcao(estado_na_fase("aberta"), MESTRE, "maltaria")
+
+    assert motivo == "Apenas Jogadores podem construir."
+
+
+def test_nao_constroi_antes_de_abrir():
+    motivo = regras.motivo_recusa_construcao(estado_na_fase("aguardando"), JOGADOR, "maltaria")
+
+    assert motivo == "A temporada não está aberta."
+
+
+def test_nao_constroi_depois_de_encerrar():
+    motivo = regras.motivo_recusa_construcao(estado_na_fase("encerrada"), JOGADOR, "maltaria")
+
+    assert motivo == "A temporada está encerrada."
+
+
+def test_tipo_de_construcao_desconhecido():
+    motivo = regras.motivo_recusa_construcao(estado_na_fase("aberta"), JOGADOR, "casa")
+
+    assert motivo == "Tipo de construção desconhecido. Escolha maltaria, tanque ou adega."
+
+
+def test_tipo_ausente_tambem_e_desconhecido():
+    motivo = regras.motivo_recusa_construcao(estado_na_fase("aberta"), JOGADOR, None)
+
+    assert motivo == "Tipo de construção desconhecido. Escolha maltaria, tanque ou adega."
+
+
+def test_cevada_insuficiente_diz_quanto_falta():
+    estado = estado_na_fase("aberta")
+    estado["toras"] = 40
+
+    motivo = regras.motivo_recusa_construcao(estado, JOGADOR, "maltaria")
+
+    assert motivo == "Cevada insuficiente: faltam 10. Aguarde a próxima colheita."
+
+
+def test_sem_cervejeiro_livre():
+    estado = estado_na_fase("aberta")
+    for i in (1, 2):
+        estado["obras"][i] = {"id": i, "tipo": "adega", "pedida_por": "Ana", "termina_em": 108.0}
+
+    motivo = regras.motivo_recusa_construcao(estado, JOGADOR, "maltaria")
+
+    assert motivo == "Nenhum cervejeiro livre. Aguarde uma obra terminar."
+
+
+# ----- Etapa 4: Mestre único na conexão (FR-017) -----
+
+def test_jogador_sempre_pode_entrar():
+    estado = regras.estado_inicial()
+    estado["mestre_sid"] = "m1"
+
+    assert regras.motivo_recusa_conexao(estado, "jogador") is None
+
+
+def test_primeiro_mestre_pode_entrar():
+    assert regras.motivo_recusa_conexao(regras.estado_inicial(), "mestre") is None
+
+
+def test_segundo_mestre_e_recusado():
+    estado = regras.estado_inicial()
+    estado["mestre_sid"] = "m1"
+
+    motivo = regras.motivo_recusa_conexao(estado, "mestre")
+
+    assert motivo == "Já existe um Mestre na cervejaria. Entre como Jogador."

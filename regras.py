@@ -60,11 +60,38 @@ def motivo_recusa_abertura(estado, participante):
     return None
 
 
-def motivo_recusa_construcao(estado, participante, tipo):
-    """Por que o pedido de construir deve ser recusado, ou None se pode construir.
+def motivo_recusa_fase(estado):
+    """Motivo comum a construir e engarrafar: só vale com a temporada aberta."""
+    if estado["fase"] == "aguardando":
+        return "A temporada não está aberta."
+    if estado["fase"] == "encerrada":
+        return "A temporada está encerrada."
+    return None
 
-    Etapa 3: só o caminho de aceite. As checagens de recusa entram na Etapa 4.
-    """
+
+def motivo_recusa_construcao(estado, participante, tipo):
+    """Por que o pedido de construir deve ser recusado, ou None se pode construir."""
+    if participante is None:
+        return MOTIVO_NAO_REGISTRADO
+    if participante["papel"] != "jogador":
+        return "Apenas Jogadores podem construir."
+    motivo_fase = motivo_recusa_fase(estado)
+    if motivo_fase:
+        return motivo_fase
+    if tipo not in TIPOS_CONSTRUCAO:
+        return "Tipo de construção desconhecido. Escolha maltaria, tanque ou adega."
+    if estado["toras"] < CUSTO_CONSTRUCAO:
+        falta = CUSTO_CONSTRUCAO - estado["toras"]
+        return f"Cevada insuficiente: faltam {falta}. Aguarde a próxima colheita."
+    if len(estado["obras"]) >= LIMITE_CERVEJEIROS:
+        return "Nenhum cervejeiro livre. Aguarde uma obra terminar."
+    return None
+
+
+def motivo_recusa_conexao(estado, papel):
+    """Por que a entrada deve ser recusada, ou None: só pode haver um Mestre por vez."""
+    if papel == "mestre" and estado["mestre_sid"] is not None:
+        return "Já existe um Mestre na cervejaria. Entre como Jogador."
     return None
 
 

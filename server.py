@@ -50,6 +50,14 @@ async def connect(sid, environ, auth):
     # servidor saber quem está pedindo cada coisa.
     dados = auth or {}
     papel = dados.get("papel", "jogador")
+    # 1. validar (sem await até registrar: duas abas entrando como Mestre ao mesmo
+    #    tempo não conseguem ocupar a vaga juntas)
+    motivo = regras.motivo_recusa_conexao(estado, papel)
+    # 2. recusar só para quem tentou entrar; ela não é registrada
+    if motivo:
+        await recusar(sid, "conexao", motivo)
+        return
+    # 3. alterar o estado: registra o participante
     estado["participantes"][sid] = {"nome": dados.get("nome") or "Anônimo", "papel": papel}
     if papel == "mestre":
         estado["mestre_sid"] = sid
