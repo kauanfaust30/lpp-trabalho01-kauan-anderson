@@ -57,6 +57,7 @@ cervejeiro durante a obra e, ao terminar, aumenta a produção de cevada.
   aumenta e um **lote de cerveja** fica pronto para engarrafar.
 - **R7.** Um lote que não for engarrafado dentro do prazo **passa do ponto** e é perdido.
 - **R8.** Ao encerrar a temporada, novos pedidos são recusados e as contagens param.
+- **R9.** Só pode haver um Mestre conectado por vez. Um segundo Mestre que tenta entrar é recusado, só ele, com o motivo.
 
 ## 3. Tabela de eventos
 
@@ -119,6 +120,7 @@ O Mestre encerra e novas ações são recusadas.
 - **FR-011:** O sistema DEVE mostrar, para cada evento emitido ou escutado, o nome, o horário, os dados, a causa e a reação do cliente.
 - **FR-012:** O sistema DEVE exibir o nome dos desenvolvedores no rodapé.
 - **FR-013 (dupla):** O sistema DEVE mostrar quantas vezes cada evento já ocorreu.
+- **FR-014:** O sistema DEVE recusar a entrada de um segundo Mestre enquanto já houver um Mestre conectado, informando o motivo apenas a quem tentou entrar.
 
 ## 6. Cenários de teste
 
@@ -144,6 +146,11 @@ e, ao fim da obra, emite `construcao.concluida` para todos, com o cervejeiro liv
 **Dado** que uma obra terminou e `lote.pronto` foi emitido,
 **quando** ninguém emite `engarrafamento.solicitado` durante o prazo,
 **então** o servidor emite `lote.perdido` para todos e o lote deixa de poder ser engarrafado.
+
+### Cenário 5 (extra): Segundo Mestre
+**Dado** que já há um Mestre conectado,
+**quando** outro cliente tenta entrar como Mestre,
+**então** o servidor emite `operacao.recusada` apenas para esse cliente, com o motivo, e o Mestre original não é afetado.
 
 ## 7. Casos de borda
 
